@@ -15,8 +15,8 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -25,7 +25,7 @@ async def main():
     print("=" * 60)
     print("验证 1：认证（JWT + 密码哈希）")
     print("=" * 60)
-    from app.auth.jwt_service import hash_password, verify_password, create_token, decode_token, AuthError
+    from app.auth.jwt_service import AuthError, create_token, decode_token, hash_password, verify_password
 
     h = hash_password("secret123")
     assert verify_password("secret123", h)
@@ -48,7 +48,7 @@ async def main():
     print("=" * 60)
     print("验证 2：多租户命名空间隔离")
     print("=" * 60)
-    from app.auth.tenant import memory_namespace, scoped_user_id
+    from app.auth.tenant import memory_namespace
 
     # 多租户关闭时（默认）
     ns = memory_namespace("default", "user1")
@@ -107,7 +107,7 @@ async def main():
     print("=" * 60)
     print("验证 5：可观测指标采集")
     print("=" * 60)
-    from app.services.observability import record_request, get_metrics
+    from app.services.observability import get_metrics, record_request
 
     record_request("/chat", 150.5, 200)
     record_request("/chat", 200.0, 200)

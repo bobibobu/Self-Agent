@@ -13,8 +13,8 @@ Phase 3 验证脚本：长期记忆 + 用户画像 + 对话日志（无需真实
 from __future__ import annotations
 
 import asyncio
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

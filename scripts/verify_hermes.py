@@ -13,12 +13,12 @@ Hermes 自我进化验证脚本（无需真实 LLM key 和数据库）
 from __future__ import annotations
 
 import asyncio
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.llm.models import ChatRequest, ChatResponse, StreamChunk, Usage
+from app.llm.models import ChatRequest, ChatResponse, StreamChunk
 
 
 class HermesMockLLM:
@@ -85,7 +85,12 @@ async def main():
     print("验证 2：能力 B — 反思 + 提示词自优化")
     print("=" * 60)
     # 先写一条对话样本到 mongo（mongo 不可用时 reflector 会 skip，这里测 prompt_store 逻辑）
-    from app.evolution.prompt_store import get_current_prompt, get_current_version, list_versions, save_version
+    from app.evolution.prompt_store import (
+        get_current_prompt,
+        get_current_version,
+        list_versions,
+        save_version,
+    )
 
     old_version = get_current_version()
     print(f"  当前提示词版本: {old_version}")

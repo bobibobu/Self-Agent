@@ -13,8 +13,8 @@ Phase 4 验证脚本：A2A 协议（无需真实 LLM key 和数据库）
 from __future__ import annotations
 
 import asyncio
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -58,8 +58,9 @@ async def main():
     print("验证 2：A2A 路由挂载 + agent.json 可访问")
     print("=" * 60)
     from fastapi import FastAPI
-    from app.a2a.server import mount_a2a
     from fastapi.testclient import TestClient
+
+    from app.a2a.server import mount_a2a
 
     app = FastAPI()
     ok = mount_a2a(app, base_url="http://localhost:8001")
@@ -83,7 +84,7 @@ async def main():
     print("验证 3：delegate_to_agent 工具注册")
     print("=" * 60)
     from app.a2a.client import delegate_to_agent
-    from app.agent.registry import register_tool, get_tool
+    from app.agent.registry import get_tool, register_tool
     register_tool(delegate_to_agent)
     t = get_tool("delegate_to_agent")
     assert t is not None, "✗ delegate 工具未注册"

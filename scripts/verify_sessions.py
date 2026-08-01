@@ -12,8 +12,8 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -22,8 +22,9 @@ async def main():
     print("=" * 60)
     print("验证 1：上下文窗口管理（超长自动摘要）")
     print("=" * 60)
-    from app.agent.context_manager import compress_if_needed, estimate_message_count
     from langchain_core.messages import HumanMessage, SystemMessage
+
+    from app.agent.context_manager import compress_if_needed, estimate_message_count
 
     # 构造超长消息（25 条，超过阈值 20）
     msgs = [SystemMessage(content="系统提示")]
@@ -47,9 +48,9 @@ async def main():
     print("=" * 60)
     print("验证 2：流式中断（cancel_registry）")
     print("=" * 60)
-    from app.agent.cancel_registry import register_stream, request_cancel, is_cancelled, unregister_stream
+    from app.agent.cancel_registry import is_cancelled, register_stream, request_cancel, unregister_stream
 
-    ev = await register_stream("test-cancel")
+    _ = await register_stream("test-cancel")
     print(f"  初始状态 cancelled={is_cancelled('test-cancel')}")
     assert not is_cancelled("test-cancel")
 

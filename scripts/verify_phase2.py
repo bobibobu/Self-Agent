@@ -14,12 +14,12 @@ Phase 2 验证脚本：MCP + Skill 系统（无需真实 LLM key 和数据库）
 from __future__ import annotations
 
 import asyncio
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.llm.models import ChatRequest, ChatResponse, ToolCall, Usage, StreamChunk
+from app.llm.models import ChatRequest, ChatResponse, StreamChunk, ToolCall, Usage
 
 
 class MockLLM:
@@ -41,7 +41,7 @@ class MockLLM:
         user_msg = next((m.content for m in reversed(request.messages) if m.role == "user"), "")
         # 检查系统提示里是否有 Skill 提示词（验证注入）
         sys_msgs = [m.content for m in request.messages if m.role == "system"]
-        sys_text = " ".join(sys_msgs)
+        _ = " ".join(sys_msgs)
 
         # 如果有 advanced_math 工具且用户问数学，触发它
         if request.tools:

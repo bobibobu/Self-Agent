@@ -119,13 +119,18 @@ class DBManager:
         from pymongo import AsyncMongoClient
 
         # serverSelectionTimeoutMS：找不到服务端时的超时（开发期 DB 没起时快速失败）
-        self._mongo_client = AsyncMongoClient(
+        client = AsyncMongoClient(
             self.settings.mongo_uri,
             serverSelectionTimeoutMS=3000,
         )
-        self._mongo_db = self._mongo_client[self.settings.mongo_db]
-        # 触发实际连接 + 鉴权校验
-        await self._mongo_db.command("ping")
+        db = client[self.settings.mongo_db]
+        # 先验证连通性与鉴权，通过后才赋值——
+        # 否则连接失败时 self._mongo_db 已经是个半初始化对象，
+        # 而全项目都用 `db_manager.mongo is not None` 当「Mongo 可用」的判据，
+        # 判断就废了：每次写日志都要抛异常再被 except 吞掉，而不是廉价地短路。
+        await db.command("ping")
+        self._mongo_client = client
+        self._mongo_db = db
         logger.info("MongoDB 已连接: %s:%s", self.settings.mongo_host, self.settings.mongo_port)
 
     @property
@@ -136,10 +141,12 @@ class DBManager:
     async def _connect_redis(self) -> None:
         from redis import asyncio as aioredis
 
-        self._redis = aioredis.from_url(
+        # 同 Mongo：验证通过后才赋值，保证 `db_manager.redis is not None` 等价于「可用」
+        client = aioredis.from_url(
             self.settings.redis_url, decode_responses=True, socket_connect_timeout=3
         )
-        await self._redis.ping()
+        await client.ping()
+        self._redis = client
         logger.info("Redis 已连接: %s:%s", self.settings.redis_host, self.settings.redis_port)
 
     @property
@@ -150,12 +157,14 @@ class DBManager:
     async def _connect_neo4j(self) -> None:
         from neo4j import AsyncGraphDatabase
 
-        self._neo4j = AsyncGraphDatabase.driver(
+        # 同 Mongo/Redis：验证通过后才赋值
+        driver = AsyncGraphDatabase.driver(
             self.settings.neo4j_uri,
             auth=(self.settings.neo4j_user, self.settings.neo4j_password),
             connection_timeout=3,    # 建连超时（秒）
         )
-        await self._neo4j.verify_connectivity()
+        await driver.verify_connectivity()
+        self._neo4j = driver
         logger.info("Neo4j 已连接: %s", self.settings.neo4j_uri)
 
     @property

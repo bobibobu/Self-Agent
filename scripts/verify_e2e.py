@@ -10,9 +10,10 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -54,7 +55,6 @@ class E2EMockLLM:
 
 async def test_ndjson_stream():
     """模拟 CLI 的 NDJSON 消费方式。"""
-    import httpx
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
@@ -78,7 +78,7 @@ async def test_ndjson_stream():
         )
         assert resp.status_code == 200
         lines = resp.text.strip().split("\n")
-        events = [json.loads(l) for l in lines if l.strip()]
+        events = [json.loads(ln) for ln in lines if ln.strip()]
 
     types = [e["type"] for e in events]
     tokens = [e for e in events if e["type"] == "token"]
@@ -115,12 +115,10 @@ async def test_sse_stream():
     events = []
     for block in body.split("\n\n"):
         if "data:" in block:
-            data_line = [l for l in block.split("\n") if l.startswith("data:")][0]
+            data_line = [ln for ln in block.split("\n") if ln.startswith("data:")][0]
             data_str = data_line[5:].strip()
-            try:
+            with contextlib.suppress(json.JSONDecodeError):
                 events.append(json.loads(data_str))
-            except json.JSONDecodeError:
-                pass
     types = [e.get("type") for e in events]
     return types, events
 

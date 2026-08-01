@@ -12,8 +12,8 @@ Agent 核心逻辑验证脚本（无需真实 LLM key 和数据库）
 from __future__ import annotations
 
 import asyncio
-import sys
 import os
+import sys
 
 # 确保项目根在 path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -73,12 +73,12 @@ async def main():
     # 注入 mock LLM 客户端
     import app.llm.factory as factory
     factory.get_llm_client.cache_clear()
-    original_create = factory.create_llm_client
+    _ = factory.create_llm_client
     factory.create_llm_client = lambda provider: MockLLMClient()
     # 关键：让 get_llm_client 返回 mock
     factory.get_llm_client = lambda provider=None: MockLLMClient()
 
-    from app.agent.graph import get_compiled_graph, run_agent
+    from app.agent.graph import run_agent
     from app.agent.tools import ALL_TOOLS
 
     print("=" * 60)

@@ -17,6 +17,44 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+# ==================== 0. 测试隔离 ====================
+
+
+class TestIsolation:
+    """回归：测试曾直接写开发者的真实数据库。
+
+    应用的对话日志与会话记录是即发即忘写入的，本机 .env 指向真实库时
+    `pytest` 会把 "计算 2**10"、"hi" 这些测试语句灌进真实对话历史，
+    用户打开 Web 端会看到一堆自己没问过的问题。
+    """
+
+    def test_databases_point_to_blackhole(self):
+        from app.core.config import get_settings
+
+        s = get_settings()
+        assert s.postgres_port == 1, "测试必须指向黑洞端口，不能连真实 Postgres"
+        assert s.mongo_port == 1, "测试必须指向黑洞端口，不能连真实 MongoDB"
+        assert s.redis_port == 1
+        assert ":1" in s.neo4j_uri
+
+    def test_no_real_llm_keys_in_tests(self):
+        """防止测试误打真实 LLM 烧钱。"""
+        from app.core.config import get_settings
+
+        s = get_settings()
+        assert not s.glm_api_key and not s.openai_api_key and not s.anthropic_api_key
+
+    @pytest.mark.asyncio
+    async def test_conversation_logging_is_a_noop_in_tests(self):
+        """Mongo 不可用时对话日志必须静默跳过，而不是抛异常或阻塞。"""
+        from app.logging_service import get_conversation_logger
+
+        await get_conversation_logger().log_event(
+            thread_id="isolation-check", user_id=None,
+            user_message="不该被写进任何地方", agent_reply="ok",
+        )  # 不抛异常即通过
+
+
 # ==================== 1. LangGraph 持久化层 API 用法 ====================
 
 
