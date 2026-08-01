@@ -16,6 +16,7 @@ import asyncio
 
 from langgraph.checkpoint.memory import MemorySaver
 
+from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.memory.pg import get_pg_pool
 
@@ -38,8 +39,23 @@ async def get_checkpointer() -> object:
         if _checkpointer is not None:
             return _checkpointer
 
-        # 统一优先尝试 Postgres（dev/prod 一致，重启不丢）
-        pool = await get_pg_pool()
+        backend = get_settings().storage_backend
+
+        # 本地形态（CLI）：单文件 SQLite，不依赖任何数据库服务
+        if backend == "sqlite":
+            from app.memory.local_store import create_sqlite_checkpointer
+
+            _checkpointer = await create_sqlite_checkpointer()
+            if _checkpointer is not None:
+                return _checkpointer
+
+        if backend == "memory":
+            _checkpointer = MemorySaver()
+            logger.info("短期记忆：MemorySaver（STORAGE_BACKEND=memory，退出即丢）")
+            return _checkpointer
+
+        # 服务端形态：优先 Postgres（dev/prod 一致，重启不丢）
+        pool = await get_pg_pool() if backend in ("auto", "postgres") else None
         if pool is not None:
             try:
                 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver

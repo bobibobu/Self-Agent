@@ -5,10 +5,12 @@ description = "Self-Agent 命令行客户端（类 Claude Code 的交互式对�
 readme = "README.md"
 requires-python = ">=3.10"
 
+# 本地模式要在本进程里跑 Agent，所以依赖主包 self-agent。
+# 开发时用 `pip install -e .` 装主包 + `pip install -e clients/cli` 装 CLI。
 dependencies = [
-    "httpx>=0.27.0",
-    "rich>=13.7.0",
-    "prompt_toolkit>=3.0.0",
+    "httpx>=0.27.0,<1.0",
+    "rich>=13.7.0,<15.0",
+    "prompt_toolkit>=3.0.0,<4.0",
 ]
 
 [project.scripts]

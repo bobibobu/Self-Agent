@@ -110,6 +110,14 @@ class Settings(BaseSettings):
     mcp_server_enabled: bool = False
     mcp_server_port: int = 9000
 
+    # ---------- 状态存储后端 ----------
+    # auto     服务端形态：优先 Postgres，连不上退内存
+    # sqlite   本地形态（CLI）：落单个 SQLite 文件，不依赖任何数据库服务
+    # memory   只在内存里，退出即丢
+    storage_backend: Literal["auto", "postgres", "sqlite", "memory"] = "auto"
+    # SQLite 文件路径。留空则按工作区自动分配到 XDG 数据目录下。
+    sqlite_path: str = ""
+
     # ---------- 工作区（编码 Agent 的上下文单位）----------
     # 留空则用进程当前目录。所有文件/Shell 工具都被禁闭在这个目录内。
     workspace_root: str = ""

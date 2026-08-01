@@ -16,6 +16,7 @@ Self-Agent CLI 主程序
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import contextlib
 import sys
@@ -343,14 +344,62 @@ async def repl(session: Session) -> None:
         console.print()  # 回复后空行
 
 
+def _parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
+    parser = argparse.ArgumentParser(
+        prog="selfagent",
+        description="Self-Agent CLI —— 在当前目录里干活的编码 Agent",
+    )
+    parser.add_argument("prompt", nargs="*", help="单次查询；留空进入交互模式")
+    parser.add_argument("--cwd", metavar="DIR", help="工作区目录（默认当前目录）")
+    parser.add_argument(
+        "--remote", metavar="URL", nargs="?", const="", default=None,
+        help="改用远程后端（默认本地内嵌运行，不需要起服务）",
+    )
+    parser.add_argument(
+        "--approval", choices=["auto", "gated", "strict", "readonly"],
+        help="工具审批策略，默认 gated（写文件与执行命令前询问）",
+    )
+    parser.add_argument("--yes", "-y", action="store_true",
+                        help="等价于 --approval auto，跳过所有确认（仅限沙箱/CI）")
+    return parser.parse_known_args(argv)
+
+
 async def async_main() -> None:
-    session = Session()
-    # 单次查询模式：selfagent "你好"
-    if len(sys.argv) > 1 and not sys.argv[1].startswith("/"):
-        message = " ".join(sys.argv[1:])
-        await run_stream(session, message)
-    else:
-        await repl(session)
+    args, _unknown = _parse_args(sys.argv[1:])
+
+    # 远程模式：老的 HTTP 瘦客户端形态
+    if args.remote is not None:
+        session = Session()
+        if args.remote:
+            session.api_url = args.remote.rstrip("/")
+        if args.prompt:
+            await run_stream(session, " ".join(args.prompt))
+        else:
+            await repl(session)
+        return
+
+    # 本地模式（默认）：Agent 跑在本进程里，操作的是**你的**磁盘
+    from selfagent_cli.local import bootstrap, setup_agent, shutdown_agent
+
+    approval = "auto" if args.yes else args.approval
+    # bootstrap 必须在任何 app.* 导入之前调用（get_settings 带 lru_cache）
+    bootstrap(args.cwd, approval_mode=approval)
+
+    try:
+        info = await setup_agent()
+    except Exception as e:  # noqa: BLE001
+        console.print(f"[red]初始化失败：{e}[/]")
+        return
+
+    try:
+        from selfagent_cli.localrepl import run_local_once, run_local_repl
+
+        if args.prompt:
+            await run_local_once(" ".join(args.prompt), info)
+        else:
+            await run_local_repl(info)
+    finally:
+        await shutdown_agent()
 
 
 def main() -> None:

@@ -117,17 +117,42 @@ cd clients/web && npm install && npm run dev   # → http://localhost:5173
 ```
 真·token 流式打字机效果 + 工具调用实时展示。
 
-### 2. 命令行 CLI（类 Claude Code）
+### 2. 命令行 CLI —— **本地模式（默认）**
 ```bash
-cd clients/cli && pip install -e .
-selfagent              # 交互式 REPL
-selfagent "你好"       # 单次查询
+pip install -e . && pip install -e clients/cli
+cd 你的项目目录
+selfagent                    # 在当前目录里干活，不需要起后端、不需要任何数据库
+selfagent "把 README 补全"    # 单次任务
 ```
-后端开了认证时先登录（token 存在 `~/.config/selfagent/credentials.json`，权限 0600）：
+Agent 跑在本进程里，文件工具操作的就是你 `cd` 进去的那个目录。
+状态落单文件 SQLite（`~/.local/share/selfagent/projects/<项目哈希>/state.db`），
+**按项目分库**——换个目录就是干净的新开始。
+
+写文件、执行命令前会停下来问你：
 ```
-/register <用户名>   新建账号    /login <用户名>   已有账号
-/sessions            列出会话    /resume <thread>  切会话并显示历史
+╭─ 需要你的确认 ───────────╮
+│ 工具：run_command        │
+│ 风险：执行命令            │
+╰──────────────────────────╯
+ pytest tests/ -q
+允许吗？ (y=允许 / n=拒绝 / a=本次会话总是允许该工具) [默认 n]
 ```
+默认是**拒绝**（直接回车即拒绝）——安全选项必须是默认值。
+`--approval auto` 或 `-y` 可跳过全部确认，但只该在沙箱/CI 里用。
+
+常用参数与命令：
+```
+--cwd DIR       指定工作区          --remote [URL]  改用远程后端（旧的 HTTP 形态）
+--approval M    审批策略             -y              跳过所有确认
+/tools  /info  /trust  /new  /help  /exit
+```
+
+### 2b. 远程模式（服务端形态）
+```bash
+selfagent --remote                 # 接 http://localhost:8000
+/register <用户名>   /login <用户名>   /sessions   /resume <thread>
+```
+token 存在 `~/.config/selfagent/credentials.json`（权限 0600）。
 
 ### 3. API 直接调用
 ```bash
@@ -216,7 +241,8 @@ cd infra && docker compose up -d --force-recreate postgres
 | JWT | 无吊销名单，改密码/登出无法使已签发 token 失效（token 里已留 `jti` 锚点） |
 | Hermes 进化 | 采纳与否只依据 LLM 自评分，没有评测集把关；反思样本取自全部对话，存在提示词注入面（已限管理员触发） |
 | 沙箱 | 已实现（bubblewrap / Landlock 分层降级）。但 Landlock 后端**只管文件系统不限制网络**；两者都不做 syscall 过滤，未防提权类攻击 |
-| CLI 架构 | CLI 仍是 HTTP 瘦客户端，文件工具操作的是**服务端**磁盘。要做 Claude Code 那样的本地 CLI，需要 CLI 内嵌 Agent（下一步） |
+| 长任务 | 单层 ReAct 循环，没有计划/TODO 分解，复杂多步任务会在 recursion_limit 内失败 |
+| 流式契约 | `stream_agent` 的事件流**必须消费完**，中途 break 会丢掉审批中断状态（有回归测试钉住） |
 | 多模态 | 图片能上传，但 LLM 层 `ChatMessage.content` 只支持纯文本，图片进不了对话 |
 | 部署 | 无应用自身的 Dockerfile，无 CI |
 

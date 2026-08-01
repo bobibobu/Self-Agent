@@ -301,6 +301,44 @@ async def get_compiled_graph() -> Any:
     return _compiled_graph
 
 
+def _interrupt_payloads(raw) -> list[dict]:
+    """把 LangGraph 的 Interrupt 对象列表转成可 JSON 序列化的审批请求。
+
+    注意剥掉 payload 自带的 "type"：外层事件已经用 type=approval_required
+    表达语义了，内层再带一个同名键会在字典展开时把它覆盖掉
+    （`{"type": "approval_required", **payload}` 里后者胜出）。
+    """
+    out = []
+    for item in raw or []:
+        value = getattr(item, "value", None)
+        if isinstance(value, dict):
+            payload = {k: v for k, v in value.items() if k != "type"}
+            out.append({**payload, "interrupt_id": getattr(item, "id", "")})
+        else:
+            out.append({"raw": str(value)})
+    return out
+
+
+async def resume_agent(
+    thread_id: str, decision, *, user_id: str | None = None, tenant_id: str = "default",
+):
+    """带着用户的审批决策续跑被中断的会话。
+
+    对应 stream_agent 里 yield 出来的 approval_required 事件：
+    客户端拿到它 → 问用户 → 调本函数把决策送回去，图从 interrupt() 处原地继续。
+
+    decision 支持 True/False、"approve"/"deny"、{"approved": bool, "reason": str}，
+    解析规则见 tools_node._parse_decision（识别不了一律按拒绝）。
+    """
+    from langgraph.types import Command
+
+    async for event in _stream_graph(
+        Command(resume=decision), thread_id=thread_id, user_id=user_id,
+        tenant_id=tenant_id, kb_ids=None, message=None, resuming=True,
+    ):
+        yield event
+
+
 async def stream_agent(message: str, thread_id: str, user_id: str | None = None, kb_ids: list[str] | None = None, tenant_id: str = "default"):
     """流式执行 Agent，逐事件 yield（真·token 级流式）。
 
@@ -309,12 +347,39 @@ async def stream_agent(message: str, thread_id: str, user_id: str | None = None,
         {"type": "tool_calls", "calls": [...]}     agent 决定调工具
         {"type": "tool_start", "name": "..."}      工具开始执行
         {"type": "tool_result", "name": "...", "content": "..."}
+        {"type": "approval_required", "tool": "...", "risk": "...", "args": {...}}
+                                                   ← 需要用户确认；用 resume_agent()
+                                                     送回决策后从中断处继续
         {"type": "done", "thread_id": "...", "reply": "完整回复"}
         {"type": "error", "message": "..."}
 
     用法：
         async for event in stream_agent(msg, tid):
             ...
+
+    ⚠️ **调用方必须把事件流消费完，不能中途 break。**
+    LangGraph 要等 astream 自然结束才会把中断状态写进 checkpointer；
+    提前中止会让随后的 resume_agent 找不到可恢复的中断，
+    表现为「用户点了同意但什么都没发生」。
+    拿到 approval_required 请先记下来，等流结束后再去问用户。
+    """
+    async for event in _stream_graph(
+        None, thread_id=thread_id, user_id=user_id, tenant_id=tenant_id,
+        kb_ids=kb_ids, message=message, resuming=False,
+    ):
+        yield event
+
+
+async def _stream_graph(
+    resume_command, *, thread_id: str, user_id: str | None, tenant_id: str,
+    kb_ids: list[str] | None, message: str | None, resuming: bool,
+):
+    """stream_agent 与 resume_agent 共用的流式主体。
+
+    两者唯一的区别是喂给 graph.astream 的输入：
+    首次是 {"messages": [HumanMessage]}，续跑是 Command(resume=决策)。
+    其余（span、取消、事件转换、收尾日志）完全一致，所以合成一个函数，
+    避免两条几乎相同的代码各自演化。
     """
     import time
 
@@ -329,6 +394,7 @@ async def stream_agent(message: str, thread_id: str, user_id: str | None = None,
     error: str | None = None
     stream_usage: dict = {}
     stream_provider: str | None = None
+    interrupted = False
 
     # agent.turn span 跨越整个异步生成器的生命周期。
     #
@@ -338,18 +404,26 @@ async def stream_agent(message: str, thread_id: str, user_id: str | None = None,
     # 归到本 turn 名下反而合理），但前提是生成器始终被同一个任务迭代。
     # SSE / NDJSON 两个端点都满足这一点。
     # tests/test_telemetry.py 里有断言锁住这棵 span 树的形状。
-    with span("agent.turn", **_turn_attrs(thread_id, tenant_id, user_id, kb_ids, streaming=True)) as turn:
+    turn_name = "agent.resume" if resuming else "agent.turn"
+    with span(turn_name, **_turn_attrs(thread_id, tenant_id, user_id, kb_ids, streaming=True)) as turn:
         graph = await get_compiled_graph()
-        # 同 run_agent：系统提示走 config，不进持久化 messages
-        system_prompt = await _build_system_prompt_with_context(message, user_id, kb_ids, tenant_id)
         config = {
             "configurable": {
                 "thread_id": scoped_tid,
                 "tools": get_all_tools(),
-                "system_prompt": system_prompt,
             },
             "recursion_limit": get_settings().agent_recursion_limit,
         }
+        if resuming:
+            # 续跑不重建系统提示：图是从 interrupt() 原地恢复的，
+            # 上下文（含系统提示）还在这一轮的执行状态里。
+            graph_input = resume_command
+        else:
+            # 同 run_agent：系统提示走 config，不进持久化 messages
+            config["configurable"]["system_prompt"] = await _build_system_prompt_with_context(
+                message or "", user_id, kb_ids, tenant_id,
+            )
+            graph_input = {"messages": [HumanMessage(content=message or "")]}
 
         # 注册流式任务（支持取消）—— 用原始 thread_id 作 cancel key（客户端用原始 id 取消）
         from app.agent.cancel_registry import register_stream, unregister_stream
@@ -359,7 +433,7 @@ async def stream_agent(message: str, thread_id: str, user_id: str | None = None,
             # 多模式流：custom（writer 推送的 token/工具事件）+ updates（节点状态变化）
             # version="v2"：统一 StreamPart dict 格式 {"type","ns","data"}（而非 v1 的元组）
             async for chunk in graph.astream(
-                {"messages": [HumanMessage(content=message)]},
+                graph_input,
                 config=config,
                 stream_mode=["custom", "updates"],
                 version="v2",
@@ -383,6 +457,17 @@ async def stream_agent(message: str, thread_id: str, user_id: str | None = None,
                         yield data  # 透传给消费端
 
                 elif chunk_type == "updates" and isinstance(data, dict):
+                    # 工具审批：tools_node 里的 interrupt() 会让整张图挂起，
+                    # 以 {"__interrupt__": [Interrupt(...)]} 的形式冒出来。
+                    # 把它转成一个前端能识别的事件，客户端据此弹确认框，
+                    # 再调 resume_agent() 带着决策续跑。
+                    if "__interrupt__" in data:
+                        for payload in _interrupt_payloads(data["__interrupt__"]):
+                            interrupted = True
+                            turn.set_attribute("selfagent.interrupted", True)
+                            yield {"type": "approval_required", "thread_id": thread_id, **payload}
+                        continue
+
                     # 节点完成后的状态更新：data 是 {node_name: state_delta}
                     for node_name, delta in data.items():
                         # 从 agent 节点的状态增量里提取最终 AIMessage 文本（兜底）
@@ -416,6 +501,13 @@ async def stream_agent(message: str, thread_id: str, user_id: str | None = None,
         if cancel_event.is_set():
             return
 
+        # 被审批中断：这一轮**还没结束**，只是在等用户决策。
+        # 此时不能发 done（客户端会以为答完了），也不能记对话日志
+        # （回复还没生成完，记下去就是一条半截的历史）。
+        # 客户端拿 approval_required 去问用户，再调 resume_agent() 续跑。
+        if interrupted:
+            return
+
         reply = "".join(full_reply_parts)
         duration_ms = int((time.time() - start) * 1000)
 
@@ -423,13 +515,15 @@ async def stream_agent(message: str, thread_id: str, user_id: str | None = None,
         yield {"type": "done", "thread_id": thread_id, "reply": reply, "error": error}
 
     # 记录对话日志（fire-and-forget，带 tenant_id + usage）
+    # 续跑轮不重复记用户提问——那是首轮的事，这里只补回复
     _spawn(_log_conversation(
-        thread_id=scoped_tid, user_id=user_id, user_message=message,
+        thread_id=scoped_tid, user_id=user_id, user_message=message or "(续跑)",
         agent_reply=reply, duration_ms=duration_ms, error=error, tenant_id=tenant_id,
         provider=stream_provider, usage=stream_usage,
     ))
     # Hermes 能力 A：异步学习（从对话抽取记忆/画像，按租户）
-    _maybe_learn(user_id, message, reply, tenant_id)
+    if message:
+        _maybe_learn(user_id, message, reply, tenant_id)
     # 更新会话记录（按租户）
     _touch_session(thread_id, user_id, tenant_id)
 
