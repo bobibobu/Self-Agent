@@ -2,24 +2,89 @@
 // 后端地址：开发时通过 vite proxy (/api → localhost:8000)，生产可配
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
-/**
- * 流式对话（SSE 传输）。
- *
- * 浏览器原生 EventSource 只支持 GET，但 /chat/stream 是 POST（带 body），
- * 所以用 fetch + ReadableStream 手动解析 SSE 文本流。
- *
- * @param {Object} params - { message, thread_id, user_id }
- * @param {Function} onEvent - 收到事件时的回调 (event) => void
- *   event 形如 { type: 'token'|'tool_calls'|'tool_start'|'tool_result'|'done'|'error', ... }
- * @returns {Promise<void>}
- */
-export async function streamChat({ message, thread_id, user_id }, onEvent) {
-  const resp = await fetch(`${API_BASE}/chat/stream`, {
+// ===== Token 管理 =====
+
+const TOKEN_KEY = 'selfagent_token'
+const USER_KEY = 'selfagent_user'
+
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+export function getUser() {
+  try {
+    return JSON.parse(localStorage.getItem(USER_KEY) || 'null')
+  } catch {
+    return null
+  }
+}
+
+export function setAuth(token, user) {
+  localStorage.setItem(TOKEN_KEY, token)
+  localStorage.setItem(USER_KEY, JSON.stringify(user))
+}
+
+export function clearAuth() {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
+}
+
+export function isLoggedIn() {
+  return !!getToken()
+}
+
+/** 构造带认证的 headers（有 token 就带 Authorization） */
+function authHeaders(extra = {}) {
+  const token = getToken()
+  const headers = { 'Content-Type': 'application/json', ...extra }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  return headers
+}
+
+// ===== 认证 =====
+
+export async function register(username, password) {
+  const resp = await fetch(`${API_BASE}/auth/register?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, thread_id, user_id }),
+  })
+  const data = await resp.json()
+  if (!resp.ok) throw new Error(data.message || '注册失败')
+  if (data.access_token) setAuth(data.access_token, data.user)
+  return data
+}
+
+export async function login(username, password) {
+  const resp = await fetch(`${API_BASE}/auth/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+  const data = await resp.json()
+  if (!resp.ok) throw new Error(data.message || '登录失败')
+  if (data.access_token) setAuth(data.access_token, data.user)
+  return data
+}
+
+// ===== 对话 =====
+
+/**
+ * 流式对话（SSE 传输）。
+ * 浏览器原生 EventSource 只支持 GET，但 /chat/stream 是 POST（带 body），
+ * 所以用 fetch + ReadableStream 手动解析 SSE 文本流。
+ */
+export async function streamChat({ message, thread_id, kb_ids }, onEvent) {
+  const resp = await fetch(`${API_BASE}/chat/stream`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ message, thread_id, kb_ids }),
   })
 
+  if (resp.status === 401) {
+    clearAuth()
+    throw new Error('登录已过期，请重新登录')
+  }
   if (!resp.ok) {
     throw new Error(`HTTP ${resp.status}: ${await resp.text()}`)
   }
@@ -33,60 +98,93 @@ export async function streamChat({ message, thread_id, user_id }, onEvent) {
     if (done) break
     buffer += decoder.decode(value, { stream: true })
 
-    // SSE 以双换行分隔事件块
     const blocks = buffer.split('\n\n')
-    buffer = blocks.pop() // 最后一块可能不完整，留到下次
+    buffer = blocks.pop()
 
     for (const block of blocks) {
       const event = parseSSEBlock(block)
       if (event) onEvent(event)
     }
   }
-  // 处理尾部残留
   if (buffer.trim()) {
     const event = parseSSEBlock(buffer)
     if (event) onEvent(event)
   }
 }
 
-/** 解析单个 SSE 事件块为 { type, ...data } */
 function parseSSEBlock(block) {
   let eventType = 'message'
   let dataStr = ''
   for (const line of block.split('\n')) {
-    if (line.startsWith('event:')) {
-      eventType = line.slice(6).trim()
-    } else if (line.startsWith('data:')) {
-      dataStr += line.slice(5).trim()
-    }
+    if (line.startsWith('event:')) eventType = line.slice(6).trim()
+    else if (line.startsWith('data:')) dataStr += line.slice(5).trim()
   }
   if (!dataStr) return null
   try {
-    const data = JSON.parse(dataStr)
-    return { type: eventType, ...data }
+    return { type: eventType, ...JSON.parse(dataStr) }
   } catch {
     return { type: eventType, raw: dataStr }
   }
 }
 
-/** 普通对话（非流式） */
-export async function chat({ message, thread_id, user_id }) {
+export async function chat({ message, thread_id, kb_ids }) {
   const resp = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, thread_id, user_id }),
+    headers: authHeaders(),
+    body: JSON.stringify({ message, thread_id, kb_ids }),
   })
+  if (resp.status === 401) { clearAuth(); throw new Error('请重新登录') }
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
   return resp.json()
 }
 
-/** 列出可用工具 */
-export async function listTools() {
-  const resp = await fetch(`${API_BASE}/tools`)
+export async function cancelChat(threadId) {
+  const resp = await fetch(`${API_BASE}/chat/cancel/${encodeURIComponent(threadId)}`, {
+    method: 'POST',
+    headers: authHeaders(),
+  })
   return resp.json()
 }
 
-/** 健康检查 */
+// ===== 会话管理 =====
+
+export async function listSessions() {
+  const resp = await fetch(`${API_BASE}/sessions`, { headers: authHeaders() })
+  if (resp.status === 401) { clearAuth(); throw new Error('请重新登录') }
+  return resp.json()
+}
+
+export async function createSession(title = '新对话') {
+  const resp = await fetch(`${API_BASE}/sessions?title=${encodeURIComponent(title)}`, {
+    method: 'POST',
+    headers: authHeaders(),
+  })
+  return resp.json()
+}
+
+export async function renameSession(threadId, title) {
+  const resp = await fetch(
+    `${API_BASE}/sessions/${encodeURIComponent(threadId)}?title=${encodeURIComponent(title)}`,
+    { method: 'PATCH', headers: authHeaders() },
+  )
+  return resp.json()
+}
+
+export async function deleteSession(threadId) {
+  const resp = await fetch(`${API_BASE}/sessions/${encodeURIComponent(threadId)}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  return resp.json()
+}
+
+// ===== 工具/健康 =====
+
+export async function listTools() {
+  const resp = await fetch(`${API_BASE}/tools`, { headers: authHeaders() })
+  return resp.json()
+}
+
 export async function health() {
   try {
     const resp = await fetch(`${API_BASE}/health`)
@@ -94,43 +192,4 @@ export async function health() {
   } catch {
     return { status: 'error' }
   }
-}
-
-// ===== 会话管理 =====
-
-/** 列出会话（按 user_id 过滤） */
-export async function listSessions(userId) {
-  const url = userId ? `${API_BASE}/sessions?user_id=${encodeURIComponent(userId)}` : `${API_BASE}/sessions`
-  const resp = await fetch(url)
-  return resp.json()
-}
-
-/** 新建会话 */
-export async function createSession(userId, title = '新对话') {
-  const url = userId
-    ? `${API_BASE}/sessions?user_id=${encodeURIComponent(userId)}&title=${encodeURIComponent(title)}`
-    : `${API_BASE}/sessions?title=${encodeURIComponent(title)}`
-  const resp = await fetch(url, { method: 'POST' })
-  return resp.json()
-}
-
-/** 重命名会话 */
-export async function renameSession(threadId, title) {
-  const resp = await fetch(
-    `${API_BASE}/sessions/${encodeURIComponent(threadId)}?title=${encodeURIComponent(title)}`,
-    { method: 'PATCH' },
-  )
-  return resp.json()
-}
-
-/** 删除会话 */
-export async function deleteSession(threadId) {
-  const resp = await fetch(`${API_BASE}/sessions/${encodeURIComponent(threadId)}`, { method: 'DELETE' })
-  return resp.json()
-}
-
-/** 取消正在进行的流式生成 */
-export async function cancelChat(threadId) {
-  const resp = await fetch(`${API_BASE}/chat/cancel/${encodeURIComponent(threadId)}`, { method: 'POST' })
-  return resp.json()
 }

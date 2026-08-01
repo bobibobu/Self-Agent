@@ -3,46 +3,49 @@ import ReactMarkdown from 'react-markdown'
 import {
   streamChat, listTools, health,
   listSessions, createSession, deleteSession, renameSession, cancelChat,
+  isLoggedIn, getUser, clearAuth,
 } from './api.js'
+import Login from './Login.jsx'
 import './App.css'
 
 export default function App() {
+  const [authed, setAuthed] = useState(isLoggedIn())
+  if (!authed) {
+    return <Login onAuthed={() => setAuthed(true)} />
+  }
+  return <ChatApp onLogout={() => { clearAuth(); setAuthed(false) }} />
+}
+
+function ChatApp({ onLogout }) {
+  const user = getUser()
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [threadId, setThreadId] = useState('')
-  const [userId, setUserId] = useState('web-user')
   const [streaming, setStreaming] = useState(false)
   const [tools, setTools] = useState([])
   const [connected, setConnected] = useState(false)
-  const [sessions, setSessions] = useState([])  // 会话列表
+  const [sessions, setSessions] = useState([])
   const messagesEndRef = useRef(null)
 
-  // 启动时：健康检查 + 加载工具 + 加载会话列表
   useEffect(() => {
     health().then((h) => setConnected(h.status === 'ok'))
     listTools().then((data) => setTools(data.tools || [])).catch(() => {})
     refreshSessions()
   }, [])
 
-  // 切换用户时刷新会话列表
-  useEffect(() => {
-    refreshSessions()
-  }, [userId])
-
-  // 自动滚动
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   async function refreshSessions() {
     try {
-      const data = await listSessions(userId)
+      const data = await listSessions()
       setSessions(data.sessions || [])
-    } catch { /* 忽略 */ }
+    } catch { /* 忽略（可能 401） */ }
   }
 
   async function handleNewSession() {
-    const session = await createSession(userId)
+    const session = await createSession()
     setThreadId(session.thread_id)
     setMessages([])
     await refreshSessions()
@@ -50,41 +53,30 @@ export default function App() {
 
   async function handleSelectSession(tid) {
     setThreadId(tid)
-    setMessages([])  // 切换会话（历史由后端 checkpointer 维持，前端只显示新一轮起）
-    // 可选：从 /history/{tid} 加载历史消息显示（留给后续增强）
+    setMessages([])
   }
 
   async function handleDeleteSession(tid, e) {
     e.stopPropagation()
     await deleteSession(tid)
-    if (tid === threadId) {
-      setThreadId('')
-      setMessages([])
-    }
+    if (tid === threadId) { setThreadId(''); setMessages([]) }
     await refreshSessions()
   }
 
   async function handleRenameSession(tid) {
     const title = window.prompt('新会话名称：')
-    if (title) {
-      await renameSession(tid, title)
-      await refreshSessions()
-    }
+    if (title) { await renameSession(tid, title); await refreshSessions() }
   }
 
   async function handleCancel() {
-    if (threadId) {
-      await cancelChat(threadId)
-      setStreaming(false)
-    }
+    if (threadId) { await cancelChat(threadId); setStreaming(false) }
   }
 
   async function send() {
     if (!input.trim() || streaming) return
     let currentThread = threadId
     if (!currentThread) {
-      // 没有会话则自动新建
-      const session = await createSession(userId)
+      const session = await createSession()
       currentThread = session.thread_id
       setThreadId(currentThread)
     }
@@ -100,41 +92,39 @@ export default function App() {
     setStreaming(true)
 
     try {
-      await streamChat(
-        { message: userMsg, thread_id: currentThread, user_id: userId },
-        (event) => {
-          setMessages((prev) => {
-            const next = [...prev]
-            const msg = next[assistantIdx]
-            if (!msg) return prev
-            if (event.type === 'token') {
-              msg.content += event.text || ''
-            } else if (event.type === 'tool_start') {
-              msg.toolSteps = [...(msg.toolSteps || []), { name: event.name, args: event.args, status: 'running' }]
-            } else if (event.type === 'tool_result') {
-              msg.toolSteps = (msg.toolSteps || []).map((s, i) =>
-                i === msg.toolSteps.length - 1 ? { ...s, status: 'done', result: event.content } : s
-              )
-            } else if (event.type === 'done') {
-              msg.streaming = false
-              if (event.reply && !msg.content) msg.content = event.reply
-            } else if (event.type === 'cancelled') {
-              msg.streaming = false
-              msg.content += '\n\n_(已中断)_'
-            } else if (event.type === 'error') {
-              msg.content += `\n\n⚠️ 错误：${event.message}`
-              msg.streaming = false
-            }
-            return next
-          })
-        },
-      )
+      await streamChat({ message: userMsg, thread_id: currentThread }, (event) => {
+        setMessages((prev) => {
+          const next = [...prev]
+          const msg = next[assistantIdx]
+          if (!msg) return prev
+          if (event.type === 'token') {
+            msg.content += event.text || ''
+          } else if (event.type === 'tool_start') {
+            msg.toolSteps = [...(msg.toolSteps || []), { name: event.name, args: event.args, status: 'running' }]
+          } else if (event.type === 'tool_result') {
+            msg.toolSteps = (msg.toolSteps || []).map((s, i) =>
+              i === msg.toolSteps.length - 1 ? { ...s, status: 'done', result: event.content } : s
+            )
+          } else if (event.type === 'done') {
+            msg.streaming = false
+            if (event.reply && !msg.content) msg.content = event.reply
+          } else if (event.type === 'cancelled') {
+            msg.streaming = false
+            msg.content += '\n\n_(已中断)_'
+          } else if (event.type === 'error') {
+            msg.content += `\n\n⚠️ ${event.message}`
+            msg.streaming = false
+          }
+          return next
+        })
+      })
       await refreshSessions()
     } catch (e) {
+      if (e.message.includes('登录')) { onLogout(); return }
       setMessages((prev) => {
         const next = [...prev]
         if (next[assistantIdx]) {
-          next[assistantIdx].content = `⚠️ 连接失败：${e.message}`
+          next[assistantIdx].content = `⚠️ ${e.message}`
           next[assistantIdx].streaming = false
         }
         return next
@@ -145,10 +135,7 @@ export default function App() {
   }
 
   function onKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      send()
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
   }
 
   return (
@@ -159,14 +146,13 @@ export default function App() {
           <span className="dot"></span>{connected ? '已连接' : '未连接'}
         </div>
 
-        <div className="field">
-          <label>用户 ID</label>
-          <input value={userId} onChange={(e) => setUserId(e.target.value)} />
+        <div className="user-box">
+          <span>👤 {user?.username || '用户'}</span>
+          <button className="logout-btn" onClick={onLogout}>退出</button>
         </div>
 
         <button className="btn-new" onClick={handleNewSession}>+ 新对话</button>
 
-        {/* 会话列表 */}
         <div className="sessions-list">
           <h3>会话 ({sessions.length})</h3>
           <ul>
@@ -178,8 +164,8 @@ export default function App() {
               >
                 <span className="session-title">{s.title || s.thread_id.slice(0, 12)}</span>
                 <span className="session-actions">
-                  <button className="icon-btn" onClick={(e) => { e.stopPropagation(); handleRenameSession(s.thread_id) }} title="重命名">✏️</button>
-                  <button className="icon-btn" onClick={(e) => handleDeleteSession(s.thread_id, e)} title="删除">🗑️</button>
+                  <button className="icon-btn" onClick={(e) => { e.stopPropagation(); handleRenameSession(s.thread_id) }}>✏️</button>
+                  <button className="icon-btn" onClick={(e) => handleDeleteSession(s.thread_id, e)}>🗑️</button>
                 </span>
               </li>
             ))}
@@ -189,9 +175,7 @@ export default function App() {
         <div className="tools-panel">
           <h3>工具 ({tools.length})</h3>
           <ul>
-            {tools.map((t) => (
-              <li key={t.name} title={t.description}>🔧 {t.name}</li>
-            ))}
+            {tools.map((t) => <li key={t.name} title={t.description}>🔧 {t.name}</li>)}
           </ul>
         </div>
       </aside>
@@ -202,7 +186,7 @@ export default function App() {
             <div className="empty">
               <div className="empty-icon">💬</div>
               <p>{threadId ? '开始对话' : '点击「新对话」开始'}</p>
-              <p className="hint">支持流式输出、工具调用、记忆增强、上下文续接</p>
+              <p className="hint">流式输出 · 工具调用 · 记忆增强 · 上下文续接</p>
             </div>
           )}
           {messages.map((msg, i) => (
@@ -237,7 +221,7 @@ export default function App() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder={threadId ? '输入消息... (Enter 发送)' : '先点击新对话，或选择左侧会话'}
+            placeholder={threadId ? '输入消息... (Enter 发送)' : '先点击新对话或选择左侧会话'}
             rows="1"
             disabled={streaming}
           />
