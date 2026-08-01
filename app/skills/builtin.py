@@ -14,7 +14,6 @@ from langchain_core.tools import tool
 from app.skills.base import SkillBase
 from app.skills.registry import skill
 
-
 # ---- Skill 内的工具（也可复用 app.agent.tools 里的） ----
 
 
@@ -27,8 +26,8 @@ def advanced_math(expression: str) -> str:
     """
     # 复用 calculator 的安全求值逻辑
     import ast
-    import operator
     import math
+    import operator
 
     _ops = {
         ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,

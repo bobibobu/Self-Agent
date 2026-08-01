@@ -16,50 +16,38 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Optional
+from typing import Any
 
 from langgraph.store.base import BaseStore
 from langgraph.store.memory import InMemoryStore
 
-from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.memory.embeddings import embedding_config, get_embed_fn, log_embedding_status
+from app.memory.pg import get_pg_pool
 
 logger = get_logger(__name__)
-
-# 开发期伪 embedding 维度
-_DEV_EMBED_DIMS = 256
 
 # 初始化锁（防并发首次调用竞态）
 _init_lock = asyncio.Lock()
 
-
-def _hash_embed(texts: list[str]) -> list[list[float]]:
-    """确定性哈希 embedding（仅开发/测试用）。
-
-    LangGraph 的 embed 接口期望：输入 list[str]，输出 list[list[float]]（每条文本一个向量）。
-    把每条文本哈希到固定维度向量，相同文本得相同向量，
-    让 InMemoryStore 的余弦相似度能跑通。
-    生产环境务必替换为真实语义 embedding（如 OpenAIEmbeddings）。
-    """
-
-    def _one(text: str) -> list[float]:
-        vec = [0.0] * _DEV_EMBED_DIMS
-        for i, ch in enumerate(text):
-            vec[i % _DEV_EMBED_DIMS] = (vec[i % _DEV_EMBED_DIMS] + ord(ch)) / 1000.0
-        norm = sum(v * v for v in vec) ** 0.5 or 1.0
-        return [v / norm for v in vec]
-
-    return [_one(t) for t in texts]
+_store: BaseStore | None = None
 
 
-_store: Optional[BaseStore] = None
+def _index_config() -> dict[str, Any]:
+    """语义检索的索引配置（维度随实际 embedding 模型走）。"""
+    _, _, dims = embedding_config()
+    return {"dims": dims, "fields": ["content"], "embed": get_embed_fn()}
 
 
 async def get_store() -> BaseStore:
     """获取长期记忆 store 单例（带锁防并发首次调用竞态）。
 
-    持久化策略（改进）：默认优先 Postgres（dev/prod 一致，重启不丢）；
-    仅当 Postgres 不可用时回退 InMemoryStore（内存 + 哈希 embedding）。
+    持久化策略：优先 Postgres（dev/prod 一致，重启不丢、多进程共享）；
+    Postgres 不可用时才回退 InMemoryStore。
+
+    注意：语义索引需要 pgvector 扩展。若库里没装 vector 扩展，
+    退而求其次建**无索引**的 PostgresStore——数据仍然持久化，
+    只是 search(query=...) 退化为按 key 排序，不做语义排序。
     """
     global _store
     if _store is not None:
@@ -69,22 +57,35 @@ async def get_store() -> BaseStore:
         if _store is not None:
             return _store
 
-        s = get_settings()
-        # 统一优先 Postgres（dev/prod 一致）
-        try:
-            from langgraph.store.postgres import PostgresStore
+        log_embedding_status()
+        pool = await get_pg_pool()
+        if pool is not None:
+            from langgraph.store.postgres import AsyncPostgresStore
 
-            store = PostgresStore.from_conn_string(
-                s.postgres_dsn_sync,
-                index={"dims": _DEV_EMBED_DIMS, "fields": ["content"], "embed": _hash_embed},
-            )
-            await store.setup()  # type: ignore[attr-defined]
-            _store = store
-            logger.info("长期记忆：PostgresStore（持久化，重启不丢）")
-        except Exception as e:  # noqa: BLE001
+            # 注意：必须用构造函数传连接池；from_conn_string 是 @contextmanager，
+            # 且 PostgresStore（同步类）不支持 aput/asearch，必须用 AsyncPostgresStore
+            try:
+                store = AsyncPostgresStore(pool, index=_index_config())
+                await store.setup()
+                _store = store
+                logger.info("长期记忆：AsyncPostgresStore + 语义索引（持久化，重启不丢）")
+            except Exception as e:  # noqa: BLE001
+                logger.warning("语义索引建立失败（通常是缺 pgvector 扩展），尝试无索引模式：%s", e)
+                try:
+                    store = AsyncPostgresStore(pool)
+                    await store.setup()
+                    _store = store
+                    logger.warning(
+                        "长期记忆：AsyncPostgresStore（持久化，但**无语义索引**）。"
+                        "要开启语义检索，请给 Postgres 装 pgvector 并执行 CREATE EXTENSION vector;"
+                    )
+                except Exception as e2:  # noqa: BLE001
+                    logger.warning("AsyncPostgresStore 初始化失败：%s", e2)
+
+        if _store is None:
             # Postgres 不可用 → 回退内存
-            _store = InMemoryStore(index={"embed": _hash_embed, "dims": _DEV_EMBED_DIMS, "fields": ["content"]})
-            logger.warning("长期记忆：Postgres 不可用，回退 InMemoryStore（重启将丢失）：%s", e)
+            _store = InMemoryStore(index=_index_config())
+            logger.warning("长期记忆：回退 InMemoryStore（重启将丢失，多进程不共享）")
 
     return _store
 
@@ -130,15 +131,18 @@ class MemoryService:
         ]
 
     async def get_all_memories(self, user_id: str, *, limit: int = 50, tenant_id: str = "default") -> list[dict[str, Any]]:
-        """列出用户全部记忆（不按语义排序，按时间倒序）。"""
+        """列出用户全部记忆。
+
+        注意：列举要用 asearch（不带 query）——aget 是「按 key 取单条」，
+        签名是 aget(namespace, key)，没有 limit 参数。
+        """
         ns = user_namespace(user_id, tenant_id)
         try:
-            all_items = await self.store.aget(ns, limit=limit)  # type: ignore[arg-type]
-            if hasattr(all_items, "__iter__") and not isinstance(all_items, dict):
-                return [{"key": i.key, "content": i.value.get("content", "")} for i in all_items]
+            items = await self.store.asearch(ns, limit=limit)
+            return [{"key": i.key, "content": (i.value or {}).get("content", "")} for i in items]
         except Exception as e:  # noqa: BLE001
             logger.warning("获取全部记忆失败：%s", e)
-        return []
+            return []
 
     async def delete_memory(self, user_id: str, key: str, *, tenant_id: str = "default") -> None:
         """删除用户的一条记忆。"""
@@ -146,7 +150,7 @@ class MemoryService:
         logger.info("长期记忆已删除 user=%s key=%s", user_id, key)
 
 
-_memory_service: Optional[MemoryService] = None
+_memory_service: MemoryService | None = None
 
 
 async def get_memory_service() -> MemoryService:

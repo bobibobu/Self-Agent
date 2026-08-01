@@ -58,7 +58,7 @@ class SelfAgentExecutor(AgentExecutor):
                 )
                 await updater.complete()
                 logger.info("A2A 任务完成 thread=%s", thread_id)
-            except Exception as e:  # noqa: BLE001
+            except Exception:  # noqa: BLE001
                 logger.exception("A2A 任务执行失败")
                 # 失败时标记 failed（a2a-sdk 的 failed 可能要求 message，try 兜底）
                 try:

@@ -16,7 +16,6 @@ FastAPI 应用，整合：
 
 from __future__ import annotations
 
-import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -25,12 +24,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router as api_router
 from app.api.upload_routes import router as upload_router
 from app.auth.routes import router as auth_router
-from app.rag.routes import router as rag_router
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import get_logger, setup_logging
 from app.db.manager import db_manager
 from app.mcp.client import mcp_client_manager
+from app.rag.routes import router as rag_router
 
 setup_logging()
 logger = get_logger(__name__)
@@ -59,11 +58,12 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Agent 工具注册表已刷新（新增 %d 个 MCP 工具）", n)
     # 加载 Skill（把 Skill 的工具注入注册表，提示词注入系统提示）
     if settings.skills_enabled:
-        from app.skills.registry import skill_registry
         # 导入 builtin 触发 @skill 注册
         import app.skills.builtin  # noqa: F401
+
         # Skill 工具走工具注册表注入
         from app.agent import registry as tool_reg
+        from app.skills.registry import skill_registry
         loaded = skill_registry.load_all_defaults(tool_registry=tool_reg)
         logger.info("✅ Skill 系统已加载（%d 个）", loaded)
     # 初始化长期记忆 store（预热单例）
@@ -90,20 +90,22 @@ async def lifespan(app: FastAPI):
     logger.info("👋 %s 关闭中，释放连接", settings.app_name)
     # 按初始化的逆序释放（依赖后者先关）
     await mcp_client_manager.disconnect()
-    await db_manager.disconnect()
-    # 释放长期记忆 store 与 checkpointer（生产环境可能持有 Postgres 连接池）
+    # 先丢掉 store/checkpointer 单例，再关它们共享的连接池
     try:
         from app.memory import store as store_mod
-        if store_mod._store is not None:
-            close_fn = getattr(store_mod._store, "aclose", None) or getattr(store_mod._store, "close", None)
-            if close_fn:
-                result = close_fn()
-                if asyncio.iscoroutine(result):
-                    await result
-            store_mod._store = None
-            store_mod._memory_service = None
+        from app.memory.checkpointer import reset_checkpointer
+
+        store_mod._store = None
+        store_mod._memory_service = None
+        await reset_checkpointer()
     except Exception as e:  # noqa: BLE001
-        logger.warning("store 关闭失败：%s", e)
+        logger.warning("释放记忆层单例失败：%s", e)
+    try:
+        from app.memory.pg import close_pg_pool
+        await close_pg_pool()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("关闭 LangGraph 连接池失败：%s", e)
+    await db_manager.disconnect()
     logger.info("✅ 已关闭")
 
 

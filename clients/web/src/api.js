@@ -45,26 +45,36 @@ function authHeaders(extra = {}) {
 
 // ===== 认证 =====
 
-export async function register(username, password) {
-  const resp = await fetch(`${API_BASE}/auth/register?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`, {
+/** 从后端错误响应里取一条可读的提示。
+ *  业务异常是 {error, message}，FastAPI 校验失败是 {detail: [...]}，两种都兜住。 */
+function errorMessage(data, fallback) {
+  if (typeof data?.message === 'string') return data.message
+  if (typeof data?.detail === 'string') return data.detail
+  if (Array.isArray(data?.detail) && data.detail.length) {
+    return data.detail[0].msg || fallback
+  }
+  return fallback
+}
+
+/** 凭据必须走请求体：query string 会被 nginx / uvicorn 的访问日志原样记下来。 */
+async function authRequest(path, body, fallbackError) {
+  const resp = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   })
-  const data = await resp.json()
-  if (!resp.ok) throw new Error(data.message || '注册失败')
+  const data = await resp.json().catch(() => ({}))
+  if (!resp.ok) throw new Error(errorMessage(data, fallbackError))
   if (data.access_token) setAuth(data.access_token, data.user)
   return data
 }
 
+export async function register(username, password) {
+  return authRequest('/auth/register', { username, password }, '注册失败')
+}
+
 export async function login(username, password) {
-  const resp = await fetch(`${API_BASE}/auth/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  })
-  const data = await resp.json()
-  if (!resp.ok) throw new Error(data.message || '登录失败')
-  if (data.access_token) setAuth(data.access_token, data.user)
-  return data
+  return authRequest('/auth/login', { username, password }, '登录失败')
 }
 
 // ===== 对话 =====

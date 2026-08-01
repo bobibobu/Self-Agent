@@ -87,9 +87,8 @@ class SkillRegistry:
         """加载所有 enabled_by_default 的 Skill。返回加载数量。"""
         count = 0
         for name, skill in self._skills.items():
-            if skill.meta and skill.meta.enabled_by_default:
-                if self.load(name, tool_registry):
-                    count += 1
+            if skill.meta and skill.meta.enabled_by_default and self.load(name, tool_registry):
+                count += 1
         if count:
             logger.info("默认加载了 %d 个 Skill", count)
         return count

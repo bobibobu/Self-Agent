@@ -44,6 +44,23 @@ class AgentError(AppError):
         super().__init__(message, code="AGENT_ERROR", status_code=500, details=details)
 
 
+class ForbiddenError(AppError):
+    """已认证但权限不足（403）。与 401「未认证」区分开。"""
+
+    def __init__(self, message: str = "权限不足"):
+        super().__init__(message, code="FORBIDDEN", status_code=403)
+
+
+class NotFoundError(AppError):
+    """资源不存在（404）。
+
+    归属校验失败时也返回它而不是 403——不泄露「这个 ID 确实存在但不属于你」。
+    """
+
+    def __init__(self, message: str = "资源不存在"):
+        super().__init__(message, code="NOT_FOUND", status_code=404)
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """把全局异常处理器挂到 FastAPI app 上。"""
     from app.core.config import get_settings

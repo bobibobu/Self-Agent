@@ -18,7 +18,6 @@ import uvicorn
 from fastapi import FastAPI
 
 from app.a2a.server import mount_a2a
-from app.core.config import get_settings
 from app.core.logging import setup_logging
 
 
@@ -41,7 +40,6 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8001)
     args = parser.parse_args()
 
-    settings = get_settings()
     base_url = f"http://localhost:{args.port}"
     app = create_a2a_app(base_url)
     uvicorn.run(app, host=args.host, port=args.port)

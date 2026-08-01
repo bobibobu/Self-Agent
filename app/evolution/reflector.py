@@ -19,10 +19,9 @@ import json
 from typing import Any
 
 from app.core.logging import get_logger
+from app.evolution.prompt_store import get_current_prompt, get_current_version, save_version
 from app.llm.factory import get_llm_client
 from app.llm.models import ChatMessage, ChatRequest
-
-from app.evolution.prompt_store import get_current_prompt, get_current_version, save_version
 
 logger = get_logger(__name__)
 

@@ -12,11 +12,9 @@ Agent 工具注册表（单一真相来源）
 
 from __future__ import annotations
 
-from typing import Any
-
 from langchain_core.tools import BaseTool
 
-from app.agent.tools import ALL_TOOLS, TOOL_MAP
+from app.agent.tools import TOOL_MAP
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)

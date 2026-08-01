@@ -38,9 +38,9 @@ class SkillBase:
     """
 
     # 元数据（子类用 @skill 装饰器注入，或直接定义 Meta 内嵌类）
-    meta: "SkillMeta | None" = None
+    meta: SkillMeta | None = None
 
-    tools: "list[BaseTool]" = []
+    tools: list[BaseTool] = []
     prompt: str = ""
 
     def on_load(self) -> None:

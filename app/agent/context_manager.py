@@ -15,11 +15,8 @@ LLM 有 token 上限（如 GLM-4.5 是 128K）。多轮长对话会累积超限�
 
 from __future__ import annotations
 
-from typing import Any
-
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
-from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.llm.factory import get_llm_client
 from app.llm.models import ChatMessage, ChatRequest

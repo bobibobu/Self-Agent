@@ -7,7 +7,7 @@ Neo4j 不可用时用内存图（dict 兜底），保证开发期可用。
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from app.core.logging import get_logger
 from app.db.manager import db_manager
@@ -78,7 +78,7 @@ class ProfileService:
 
         if self._ensure_neo4j():
             await self._neo4j_write(
-                "MERGE (u:User {id: $user_id}) SET u.`%s` = $value" % attr,
+                f"MERGE (u:User {{id: $user_id}}) SET u.`{attr}` = $value",
                 user_id=user_id, value=value,
             )
         else:
@@ -152,7 +152,7 @@ class ProfileService:
 
 
 # 单例
-_profile_service: Optional[ProfileService] = None
+_profile_service: ProfileService | None = None
 
 
 def get_profile_service() -> ProfileService:

@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.core.logging import get_logger
@@ -17,13 +17,18 @@ from app.db.manager import db_manager
 
 logger = get_logger(__name__)
 
-# 内置价格表（美元/百万 token），用于成本估算。None = 免费
+# 内置价格表（美元/百万 token），用于成本估算。
+# 注意：这是**估算**用的静态快照，厂商随时可能调价，接入计费前请核对官方价目。
 _PRICE_TABLE: dict[str, dict[str, float | None]] = {
+    # 智谱 GLM
     "glm-4.5-flash": {"input": 0.0, "output": 0.0},
-    "glm-4.6": {"input": 0.6, "output": 2.2},
     "glm-4.5": {"input": 0.6, "output": 2.2},
+    "glm-4.6": {"input": 0.6, "output": 2.2},
+    # OpenAI
     "gpt-4o-mini": {"input": 0.15, "output": 0.6},
     "gpt-4o": {"input": 2.5, "output": 10.0},
+    # Anthropic
+    "claude-haiku-4-5-20251001": {"input": 1.0, "output": 5.0},
     "claude-3-5-haiku-latest": {"input": 0.8, "output": 4.0},
 }
 
@@ -39,18 +44,21 @@ def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> flo
 class StatsService:
     """用量统计。"""
 
-    async def get_usage_stats(self, *, user_id: str | None = None, days: int = 7) -> dict[str, Any]:
+    async def get_usage_stats(
+        self, *, user_id: str | None = None, days: int = 7, tenant_id: str = "default",
+    ) -> dict[str, Any]:
         """获取用量统计（token 数、成本、请求数、按天分布）。
 
         Args:
-            user_id: 按用户过滤（None 则全部）
+            user_id: 按用户过滤（None 则该租户全部）
             days: 统计最近多少天
+            tenant_id: 租户过滤（**必过滤**，防跨租户看他人用量）
         """
         if db_manager.mongo is None:
             return {"error": "MongoDB 不可用"}
 
-        since = datetime.now(timezone.utc) - timedelta(days=days)
-        match: dict[str, Any] = {"ts": {"$gte": since}}
+        since = datetime.now(UTC) - timedelta(days=days)
+        match: dict[str, Any] = {"ts": {"$gte": since}, "tenant_id": tenant_id}
         if user_id:
             match["user_id"] = user_id
 

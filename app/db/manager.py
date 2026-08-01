@@ -12,7 +12,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
@@ -21,11 +21,11 @@ logger = get_logger(__name__)
 
 # 仅类型检查时导入，运行时按需导入避免强依赖
 if TYPE_CHECKING:
+    import asyncpg
     from neo4j import AsyncDriver
     from pymongo import AsyncMongoClient
     from pymongo.database import Database as MongoDatabase
     from redis import asyncio as aioredis
-    import asyncpg
 
 
 class DBManager:
@@ -34,11 +34,11 @@ class DBManager:
     def __init__(self) -> None:
         self.settings = get_settings()
         # 各客户端懒加载
-        self._postgres: Optional["asyncpg.Pool"] = None
-        self._mongo_client: Optional["AsyncMongoClient"] = None
-        self._mongo_db: Optional["MongoDatabase"] = None
-        self._redis: Optional["aioredis.Redis"] = None
-        self._neo4j: Optional["AsyncDriver"] = None
+        self._postgres: asyncpg.Pool | None = None
+        self._mongo_client: AsyncMongoClient | None = None
+        self._mongo_db: MongoDatabase | None = None
+        self._redis: aioredis.Redis | None = None
+        self._neo4j: AsyncDriver | None = None
 
     # ---------- 生命周期 ----------
     async def connect(self) -> None:
@@ -111,7 +111,7 @@ class DBManager:
         logger.info("PostgreSQL 已连接: %s:%s", self.settings.postgres_host, self.settings.postgres_port)
 
     @property
-    def postgres(self) -> "Optional[asyncpg.Pool]":
+    def postgres(self) -> asyncpg.Pool | None:
         return self._postgres
 
     # ---------- MongoDB ----------
@@ -129,7 +129,7 @@ class DBManager:
         logger.info("MongoDB 已连接: %s:%s", self.settings.mongo_host, self.settings.mongo_port)
 
     @property
-    def mongo(self) -> "Optional[MongoDatabase]":
+    def mongo(self) -> MongoDatabase | None:
         return self._mongo_db
 
     # ---------- Redis ----------
@@ -143,7 +143,7 @@ class DBManager:
         logger.info("Redis 已连接: %s:%s", self.settings.redis_host, self.settings.redis_port)
 
     @property
-    def redis(self) -> "Optional[aioredis.Redis]":
+    def redis(self) -> aioredis.Redis | None:
         return self._redis
 
     # ---------- Neo4j ----------
@@ -159,7 +159,7 @@ class DBManager:
         logger.info("Neo4j 已连接: %s", self.settings.neo4j_uri)
 
     @property
-    def neo4j(self) -> "Optional[AsyncDriver]":
+    def neo4j(self) -> AsyncDriver | None:
         return self._neo4j
 
 

@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from app.core.logging import get_logger
 from app.db.manager import db_manager
@@ -71,25 +71,31 @@ class SessionService:
             logger.warning("创建会话记录失败（仍返回可用 thread_id）：%s", e)
             return {"thread_id": thread_id, "title": title, "user_id": user_id, "tenant_id": tenant_id, "source": "memory"}
 
-    async def rename_session(self, thread_id: str, title: str, *, tenant_id: str = "default") -> bool:
-        """重命名会话（按租户校验归属）。"""
+    async def rename_session(
+        self, thread_id: str, title: str, *, tenant_id: str = "default", user_id: str | None = None,
+    ) -> bool:
+        """重命名会话（按租户 + 归属人校验）。"""
         try:
             pool = db_manager.postgres
             if pool is None:
                 return False
+            sql = ("UPDATE conversations SET title = $1, updated_at = now() "
+                   "WHERE thread_id = $2 AND tenant_id = $3")
+            args: list[Any] = [title, thread_id, tenant_id]
+            if user_id is not None:
+                sql += " AND user_id = $4"
+                args.append(user_id)
             async with pool.acquire() as conn:
-                result = await conn.execute(
-                    "UPDATE conversations SET title = $1, updated_at = now() "
-                    "WHERE thread_id = $2 AND tenant_id = $3",
-                    title, thread_id, tenant_id,
-                )
-            return "UPDATE 1" in result or int(result.split()[-1]) > 0
+                result = await conn.execute(sql, *args)
+            return self._affected(result) > 0
         except Exception as e:  # noqa: BLE001
             logger.warning("重命名会话失败：%s", e)
             return False
 
-    async def delete_session(self, thread_id: str, *, tenant_id: str = "default") -> bool:
-        """删除会话（按租户校验归属，含清理 checkpointer 状态）。"""
+    async def delete_session(
+        self, thread_id: str, *, tenant_id: str = "default", user_id: str | None = None,
+    ) -> bool:
+        """删除会话（按租户 + 归属人校验，含清理 checkpointer 状态）。"""
         from app.auth.tenant import scoped_thread_id
 
         try:
@@ -97,38 +103,65 @@ class SessionService:
             if pool is None:
                 return False
             scoped_tid = scoped_thread_id(tenant_id, thread_id)
+            sql = "DELETE FROM conversations WHERE thread_id = $1 AND tenant_id = $2"
+            args: list[Any] = [thread_id, tenant_id]
+            if user_id is not None:
+                sql += " AND user_id = $3"
+                args.append(user_id)
             async with pool.acquire() as conn:
-                result = await conn.execute(
-                    "DELETE FROM conversations WHERE thread_id = $1 AND tenant_id = $2",
-                    thread_id, tenant_id,
-                )
-                # 清理 LangGraph checkpointer 中该 scoped thread 的状态
-                try:
-                    await conn.execute("DELETE FROM checkpoints WHERE thread_id = $1", scoped_tid)
-                    await conn.execute("DELETE FROM checkpoint_writes WHERE thread_id = $1", scoped_tid)
-                    await conn.execute("DELETE FROM checkpoint_blobs WHERE thread_id = $1", scoped_tid)
-                except Exception:  # noqa: BLE001
-                    pass
-            deleted = "DELETE 1" in result or int(result.split()[-1]) > 0
+                result = await conn.execute(sql, *args)
+            deleted = self._affected(result) > 0
+            # 只有确实删掉了会话记录，才清理对应的对话状态——
+            # 否则越权删除请求会连带把别人的历史清空
             if deleted:
+                await self._purge_thread_state(scoped_tid)
                 logger.info("删除会话 thread=%s tenant=%s", thread_id, tenant_id)
             return deleted
         except Exception as e:  # noqa: BLE001
             logger.warning("删除会话失败：%s", e)
             return False
 
-    async def get_session(self, thread_id: str, *, tenant_id: str = "default") -> dict[str, Any] | None:
-        """获取单个会话信息（按租户校验归属）。"""
+    @staticmethod
+    async def _purge_thread_state(scoped_thread_id: str) -> None:
+        """清理 LangGraph checkpointer 里该 thread 的状态。
+
+        走 checkpointer 的 adelete_thread()，不再手写 DELETE FROM checkpoints...——
+        那些表名是 LangGraph 的内部实现，版本升级会悄悄失效。
+        """
         try:
-            rows = await self._exec(
-                "SELECT id, thread_id, title, user_id, tenant_id, created_at, updated_at "
-                "FROM conversations WHERE thread_id = $1 AND tenant_id = $2",
-                thread_id, tenant_id,
-            )
+            from app.memory.checkpointer import get_checkpointer
+
+            cp = await get_checkpointer()
+            deleter = getattr(cp, "adelete_thread", None)
+            if deleter is not None:
+                await deleter(scoped_thread_id)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("清理会话状态失败 thread=%s：%s", scoped_thread_id, e)
+
+    async def get_session(
+        self, thread_id: str, *, tenant_id: str = "default", user_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        """获取单个会话信息（按租户 + 归属人校验）。"""
+        try:
+            sql = ("SELECT id, thread_id, title, user_id, tenant_id, created_at, updated_at "
+                   "FROM conversations WHERE thread_id = $1 AND tenant_id = $2")
+            args: list[Any] = [thread_id, tenant_id]
+            if user_id is not None:
+                sql += " AND user_id = $3"
+                args.append(user_id)
+            rows = await self._exec(sql, *args)
             return self._row_to_dict(rows[0]) if rows else None
         except Exception as e:  # noqa: BLE001
             logger.warning("获取会话失败：%s", e)
             return None
+
+    @staticmethod
+    def _affected(status: str) -> int:
+        """从 asyncpg 的命令状态串（如 "DELETE 1"）解析受影响行数。"""
+        try:
+            return int(status.split()[-1])
+        except (ValueError, IndexError, AttributeError):
+            return 0
 
     async def touch_session(self, thread_id: str, user_id: str | None = None, tenant_id: str = "default") -> None:
         """更新会话的 updated_at（按租户 upsert）。"""
@@ -137,10 +170,12 @@ class SessionService:
             if pool is None:
                 return
             async with pool.acquire() as conn:
+                # 冲突键是 (tenant_id, thread_id)——thread_id 单列唯一会让两个租户
+                # 用同一 thread_id 时互相覆盖（见 migrations/001）
                 await conn.execute(
                     "INSERT INTO conversations (thread_id, user_id, title, tenant_id) "
                     "VALUES ($1, $2, '对话', $3) "
-                    "ON CONFLICT (thread_id) DO UPDATE SET updated_at = now()",
+                    "ON CONFLICT (tenant_id, thread_id) DO UPDATE SET updated_at = now()",
                     thread_id, user_id, tenant_id,
                 )
         except Exception as e:  # noqa: BLE001
@@ -165,7 +200,7 @@ class SessionService:
         return d
 
 
-_session_service: Optional[SessionService] = None
+_session_service: SessionService | None = None
 
 
 def get_session_service() -> SessionService:

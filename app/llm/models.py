@@ -7,7 +7,8 @@ LLM 统一数据模型
 
 from __future__ import annotations
 
-from typing import Any, AsyncIterator, Literal
+from collections.abc import AsyncIterator
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -82,11 +83,19 @@ class ChatResponse(BaseModel):
 
 
 class StreamChunk(BaseModel):
-    """流式输出的单个片段。"""
+    """流式输出的单个片段。
+
+    tool_calls / usage / model 只在**流结束时的最后一个 chunk**上出现：
+    provider 内部把跨 chunk 的 tool_call 增量按 index 聚合完再一次性给出，
+    这样调用方一次流式请求就能同时拿到文本和工具调用决策，
+    不需要再补一次非流式调用去「复查」。
+    """
 
     content: str = ""                        # 增量文本（可能为空）
-    tool_calls: list[ToolCall] | None = None # 增量工具调用（多数在最后聚合）
+    tool_calls: list[ToolCall] | None = None # 聚合完成的工具调用（仅末尾 chunk）
     finish_reason: str | None = None
+    usage: Usage | None = None               # token 用量（仅末尾 chunk）
+    model: str = ""                          # 实际使用的模型（仅末尾 chunk）
 
 
 # 为了类型注解清晰，定义流式产出的类型别名

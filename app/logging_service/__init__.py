@@ -9,8 +9,8 @@ Mongo 不可用时静默跳过（日志记录失败不影响对话主流程）�
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from app.core.logging import get_logger
 from app.db.manager import db_manager
@@ -53,7 +53,7 @@ class ConversationLogger:
             "usage": usage or {},
             "duration_ms": duration_ms,
             "error": error,
-            "ts": datetime.now(timezone.utc),
+            "ts": datetime.now(UTC),
         }
 
         if db_manager.mongo is None:
@@ -88,7 +88,7 @@ class ConversationLogger:
             return []
 
 
-_conversation_logger: Optional[ConversationLogger] = None
+_conversation_logger: ConversationLogger | None = None
 
 
 def get_conversation_logger() -> ConversationLogger:

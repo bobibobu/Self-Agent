@@ -23,7 +23,10 @@ services:
   #             且支持事务与向量检索(pgvector)。
   # -----------------------------------------------------------------
   postgres:
-    image: docker.1panel.live/library/postgres:16-alpine
+    # 用 pgvector 镜像而不是原版 postgres：LangGraph 的 PostgresStore 建
+    # 语义索引时需要 vector 扩展，原版镜像里没有，store.setup() 会失败
+    # （应用会降级成「持久化但无语义检索」，见 app/memory/store.py）。
+    image: pgvector/pgvector:pg16
     container_name: selfagent-postgres
     restart: unless-stopped
     environment:

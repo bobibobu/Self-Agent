@@ -27,6 +27,8 @@ def create_llm_client(provider: ProviderName) -> LLMClient:
     """创建指定 provider 的 LLM 客户端（每次返回新实例）。"""
     s = get_settings()
 
+    common = {"timeout": s.llm_timeout_seconds, "max_retries": s.llm_max_retries}
+
     if provider == "glm":
         if not s.glm_api_key:
             raise ConfigError("GLM_API_KEY 未配置，请在 .env 中设置")
@@ -35,6 +37,7 @@ def create_llm_client(provider: ProviderName) -> LLMClient:
             base_url=s.glm_base_url,
             default_model=s.glm_model,
             provider_name="glm",
+            **common,
         )
 
     if provider == "openai":
@@ -45,6 +48,7 @@ def create_llm_client(provider: ProviderName) -> LLMClient:
             base_url=s.openai_base_url,
             default_model=s.openai_model,
             provider_name="openai",
+            **common,
         )
 
     if provider == "anthropic":
@@ -54,6 +58,7 @@ def create_llm_client(provider: ProviderName) -> LLMClient:
             api_key=s.anthropic_api_key,
             base_url=s.anthropic_base_url,
             default_model=s.anthropic_model,
+            **common,
         )
 
     raise ConfigError(f"未知的 LLM provider: {provider}")

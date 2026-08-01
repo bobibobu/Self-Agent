@@ -20,6 +20,7 @@ from fastapi import Depends, Request
 
 from app.auth.jwt_service import AuthError, decode_token, extract_token_from_header
 from app.core.config import get_settings
+from app.core.exceptions import ForbiddenError
 
 
 @dataclass
@@ -30,10 +31,25 @@ class CurrentUser:
     tenant_id: str = "default"
     username: str = ""
     is_authenticated: bool = True
+    role: str = "user"
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role == "admin"
 
 
 # dev 模式的默认用户（auth_enabled=False 时使用）
 _DEFAULT_USER = CurrentUser(user_id="anonymous", tenant_id="default", username="anonymous", is_authenticated=False)
+
+
+def _user_from_payload(payload: dict) -> CurrentUser:
+    return CurrentUser(
+        user_id=payload["sub"],
+        tenant_id=payload.get("tenant", "default"),
+        username=payload.get("username", ""),
+        is_authenticated=True,
+        role=payload.get("role", "user"),
+    )
 
 
 async def get_current_user(request: Request) -> CurrentUser:
@@ -49,13 +65,24 @@ async def get_current_user(request: Request) -> CurrentUser:
     auth_header = request.headers.get("Authorization")
     token = extract_token_from_header(auth_header)
     payload = decode_token(token)
+    return _user_from_payload(payload)
 
-    return CurrentUser(
-        user_id=payload["sub"],
-        tenant_id=payload.get("tenant", "default"),
-        username=payload.get("username", ""),
-        is_authenticated=True,
-    )
+
+async def require_admin(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    """FastAPI 依赖：要求管理员身份。
+
+    用于 /evolution、/stats、/metrics 这类管理面接口——它们能改写全局系统
+    提示词、查看他人用量、暴露基础设施状态，不该对普通用户开放。
+
+    auth_enabled=False 时放行：此时整个服务本来就是无鉴权的调试形态，
+    再在这里拦一道只会造成「dev 下管理接口不可用」的困惑。
+    生产环境启动时已强制 AUTH_ENABLED=true（见 app/main.py），不存在绕过。
+    """
+    if not get_settings().auth_enabled:
+        return user
+    if not user.is_admin:
+        raise ForbiddenError("需要管理员权限")
+    return user
 
 
 async def get_optional_user(request: Request) -> CurrentUser:

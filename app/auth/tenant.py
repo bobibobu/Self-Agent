@@ -14,6 +14,42 @@
 
 from __future__ import annotations
 
+DEFAULT_TENANT = "default"
+
+
+def allowed_tenants() -> set[str]:
+    """配置里允许的租户集合。始终包含 default。"""
+    from app.core.config import get_settings
+
+    raw = get_settings().tenant_allowlist or ""
+    tenants = {t.strip() for t in raw.split(",") if t.strip()}
+    tenants.add(DEFAULT_TENANT)
+    return tenants
+
+
+def resolve_tenant(request) -> str:
+    """从请求解析租户 ID —— **服务端说了算，不接受请求体自由指定**。
+
+    原来 /auth/register 的 tenant_id 是从请求体读的，等于任何人都能
+    自助注册进任意租户，多租户隔离形同虚设。现在改为：
+
+    - 未启用多租户            → 恒为 default
+    - 启用多租户              → 从配置的请求头读，且必须命中 allowlist，否则拒绝
+
+    生产建议由网关按域名/证书注入该头，并禁止外部直接传入。
+    """
+    from app.auth.jwt_service import AuthError
+    from app.core.config import get_settings
+
+    s = get_settings()
+    if not s.multi_tenant_enabled:
+        return DEFAULT_TENANT
+
+    claimed = (request.headers.get(s.tenant_header) or DEFAULT_TENANT).strip()
+    if claimed not in allowed_tenants():
+        raise AuthError(f"未知或不被允许的租户：{claimed}")
+    return claimed
+
 
 def memory_namespace(tenant_id: str, user_id: str) -> tuple[str, ...]:
     """构造租户隔离的记忆命名空间。

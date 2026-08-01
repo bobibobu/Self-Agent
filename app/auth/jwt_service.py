@@ -8,7 +8,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
@@ -52,19 +53,28 @@ def verify_password(plain: str, hashed: str) -> bool:
 # ---------- JWT ----------
 
 
+def is_admin_username(username: str) -> bool:
+    """用户名是否在 ADMIN_USERNAMES 名单里。"""
+    raw = get_settings().admin_usernames or ""
+    return username in {u.strip() for u in raw.split(",") if u.strip()}
+
+
 def create_token(*, user_id: str, tenant_id: str = "default", username: str = "") -> str:
-    """签发 JWT。claims 含 user_id / tenant_id / username / 过期时间。"""
+    """签发 JWT。claims 含 user_id / tenant_id / username / role / 过期时间。"""
     s = get_settings()
-    expire = datetime.now(timezone.utc) + timedelta(hours=s.jwt_expire_hours)
+    now = datetime.now(UTC)
     payload = {
         "sub": user_id,          # subject = user_id
         "tenant": tenant_id,     # 租户
         "username": username,
-        "exp": expire,
-        "iat": datetime.now(timezone.utc),
+        "role": "admin" if is_admin_username(username) else "user",
+        "exp": now + timedelta(hours=s.jwt_expire_hours),
+        "iat": now,
+        # jti：给后续做 token 吊销名单留的锚点（当前未实现吊销，见 README 已知限制）
+        "jti": uuid.uuid4().hex,
     }
     token = jwt.encode(payload, s.jwt_secret, algorithm=s.jwt_algorithm)
-    logger.info("签发 token user=%s tenant=%s", user_id, tenant_id)
+    logger.info("签发 token user=%s tenant=%s role=%s", user_id, tenant_id, payload["role"])
     return token
 
 
@@ -73,10 +83,10 @@ def decode_token(token: str) -> dict[str, Any]:
     s = get_settings()
     try:
         payload = jwt.decode(token, s.jwt_secret, algorithms=[s.jwt_algorithm])
-    except jwt.ExpiredSignatureError:
-        raise AuthError("Token 已过期")
-    except jwt.InvalidTokenError:
-        raise AuthError("无效的 Token")
+    except jwt.ExpiredSignatureError as e:
+        raise AuthError("Token 已过期") from e
+    except jwt.InvalidTokenError as e:
+        raise AuthError("无效的 Token") from e
 
     if "sub" not in payload:
         raise AuthError("Token 缺少用户信息")

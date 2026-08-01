@@ -50,19 +50,24 @@ class _MockLLM:
         return ChatResponse(content=f"你好，你说了：{user_msg}", model="mock", finish_reason="stop")
 
     async def stream_chat(self, request):
-        """流式：复用 chat 的判断逻辑，工具调用时不产文本，文本回复时逐 token。"""
+        """流式：复用 chat 的判断逻辑，逐 token 产文本，末尾 chunk 带聚合结果。
+
+        契约（与真实 provider 一致）：tool_calls / usage / model 只出现在
+        流末尾的收尾 chunk 上——调用方一次流式请求就拿到全部信息，
+        不需要再补一次非流式调用。
+        """
         from app.llm.models import StreamChunk
 
         resp = await self.chat(request)
-        if resp.tool_calls:
-            # 工具调用：不产文本 token，只标记 finish
-            yield StreamChunk(content="", finish_reason="tool_calls")
-            return
-        # 文本回复：逐字符产出（模拟 token 流）
-        text = resp.content or ""
-        for i, ch in enumerate(text):
-            is_last = i == len(text) - 1
-            yield StreamChunk(content=ch, finish_reason="stop" if is_last else None)
+        for ch in (resp.content or ""):
+            yield StreamChunk(content=ch)
+        yield StreamChunk(
+            content="",
+            tool_calls=resp.tool_calls or None,
+            finish_reason=resp.finish_reason,
+            usage=resp.usage,
+            model=resp.model,
+        )
 
 
 @pytest.fixture

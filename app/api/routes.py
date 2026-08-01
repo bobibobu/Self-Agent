@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sse_starlette.sse import EventSourceResponse
 
 from app import __version__
-from app.agent.graph import get_compiled_graph, run_agent, stream_agent
+from app.agent.graph import run_agent, stream_agent
 from app.api.schemas import (
     AddInterestRequest,
     AddMemoryRequest,
@@ -26,9 +26,9 @@ from app.api.schemas import (
     ChatResponse,
     HealthResponse,
 )
-from app.auth.dependencies import CurrentUser, get_current_user
+from app.auth.dependencies import CurrentUser, get_current_user, require_admin
 from app.core.config import get_settings
-from app.core.exceptions import AgentError
+from app.core.exceptions import AgentError, NotFoundError
 from app.core.logging import get_logger, new_trace_id
 from app.llm.factory import get_llm_client
 
@@ -160,8 +160,8 @@ async def add_memory(req: AddMemoryRequest, user: CurrentUser = Depends(get_curr
 @router.get("/memory/{user_id}", tags=["记忆"])
 async def search_memory(user_id: str, query: str, limit: int = 5, user: CurrentUser = Depends(get_current_user)):
     """语义检索用户的长期记忆（认证开启时校验 user_id 归属）。"""
-    from app.memory.store import get_memory_service
     from app.auth.dependencies import _enforce_owner_or_anon
+    from app.memory.store import get_memory_service
 
     _enforce_owner_or_anon(user, user_id)
     mem_service = await get_memory_service()
@@ -172,8 +172,8 @@ async def search_memory(user_id: str, query: str, limit: int = 5, user: CurrentU
 @router.get("/memory/{user_id}/all", tags=["记忆"])
 async def list_memories(user_id: str, limit: int = 50, user: CurrentUser = Depends(get_current_user)):
     """列出用户全部长期记忆（认证开启时校验归属）。"""
-    from app.memory.store import get_memory_service
     from app.auth.dependencies import _enforce_owner_or_anon
+    from app.memory.store import get_memory_service
 
     _enforce_owner_or_anon(user, user_id)
     mem_service = await get_memory_service()
@@ -184,8 +184,8 @@ async def list_memories(user_id: str, limit: int = 50, user: CurrentUser = Depen
 @router.delete("/memory/{user_id}/{key}", tags=["记忆"])
 async def delete_memory(user_id: str, key: str, user: CurrentUser = Depends(get_current_user)):
     """删除用户的一条长期记忆（认证开启时校验归属）。"""
-    from app.memory.store import get_memory_service
     from app.auth.dependencies import _enforce_owner_or_anon
+    from app.memory.store import get_memory_service
 
     _enforce_owner_or_anon(user, user_id)
     mem_service = await get_memory_service()
@@ -199,8 +199,8 @@ async def delete_memory(user_id: str, key: str, user: CurrentUser = Depends(get_
 @router.post("/profile/interest", tags=["用户画像"])
 async def add_interest(req: AddInterestRequest, user: CurrentUser = Depends(get_current_user)):
     """记录用户兴趣（按租户作用域）。"""
-    from app.profile.service import get_profile_service
     from app.auth.tenant import scoped_user_id
+    from app.profile.service import get_profile_service
 
     uid = scoped_user_id(user.tenant_id, req.user_id if not user.is_authenticated else user.user_id)
     await get_profile_service().add_interest(uid, req.interest)
@@ -210,8 +210,8 @@ async def add_interest(req: AddInterestRequest, user: CurrentUser = Depends(get_
 @router.post("/profile/preference", tags=["用户画像"])
 async def add_preference(req: AddPreferenceRequest, user: CurrentUser = Depends(get_current_user)):
     """记录用户偏好（按租户作用域）。"""
-    from app.profile.service import get_profile_service
     from app.auth.tenant import scoped_user_id
+    from app.profile.service import get_profile_service
 
     uid = scoped_user_id(user.tenant_id, req.user_id if not user.is_authenticated else user.user_id)
     await get_profile_service().add_preference(uid, req.key, req.value)
@@ -221,9 +221,9 @@ async def add_preference(req: AddPreferenceRequest, user: CurrentUser = Depends(
 @router.get("/profile/{user_id}", tags=["用户画像"])
 async def get_profile(user_id: str, user: CurrentUser = Depends(get_current_user)):
     """获取用户完整画像（按租户作用域）。"""
-    from app.profile.service import get_profile_service
     from app.auth.dependencies import _enforce_owner_or_anon
     from app.auth.tenant import scoped_user_id
+    from app.profile.service import get_profile_service
 
     _enforce_owner_or_anon(user, user_id)
     uid = scoped_user_id(user.tenant_id, user_id)
@@ -237,8 +237,8 @@ async def get_profile(user_id: str, user: CurrentUser = Depends(get_current_user
 @router.get("/history/{thread_id}", tags=["对话"])
 async def get_history(thread_id: str, limit: int = 20, user: CurrentUser = Depends(get_current_user)):
     """查询某会话的对话历史（从 MongoDB，按租户隔离）。"""
-    from app.logging_service import get_conversation_logger
     from app.auth.tenant import scoped_thread_id
+    from app.logging_service import get_conversation_logger
 
     scoped_tid = scoped_thread_id(user.tenant_id, thread_id)
     events = await get_conversation_logger().get_history(scoped_tid, limit=limit)
@@ -246,9 +246,18 @@ async def get_history(thread_id: str, limit: int = 20, user: CurrentUser = Depen
 
 
 @router.post("/chat/cancel/{thread_id}", tags=["对话"])
-async def cancel_chat(thread_id: str):
-    """取消正在进行的流式生成。"""
+async def cancel_chat(thread_id: str, user: CurrentUser = Depends(get_current_user)):
+    """取消正在进行的流式生成（需认证，且只能取消自己的会话）。"""
     from app.agent.cancel_registry import request_cancel
+    from app.services.session_service import get_session_service
+
+    # 归属校验：否则任何人猜到 thread_id 就能打断别人的生成
+    if user.is_authenticated:
+        owned = await get_session_service().get_session(
+            thread_id, tenant_id=user.tenant_id, user_id=user.user_id,
+        )
+        if owned is None:
+            raise NotFoundError("会话不存在")
 
     found = await request_cancel(thread_id)
     return {"status": "cancelled" if found else "not_found", "thread_id": thread_id}
@@ -257,9 +266,19 @@ async def cancel_chat(thread_id: str):
 # ==================== 会话管理 ====================
 
 
+# 会话归属：认证开启时锁定到 token 里的 user_id（防同租户下互删会话的 IDOR）；
+# 匿名模式下 owner 为 None，退化为「按租户共享」的调试形态。
+def _session_owner(user: CurrentUser) -> str | None:
+    return user.user_id if user.is_authenticated else None
+
+
 @router.get("/sessions", tags=["会话"])
-async def list_sessions(user_id: str | None = None, limit: int = 50, user: CurrentUser = Depends(get_current_user)):
-    """列出会话（按租户隔离，可按 user_id 过滤）。"""
+async def list_sessions(
+    user_id: str | None = None,
+    limit: int = Query(50, ge=1, le=200),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """列出会话（按租户隔离；认证后只列自己的）。"""
     from app.services.session_service import get_session_service
 
     uid = user.user_id if user.is_authenticated else user_id
@@ -268,7 +287,11 @@ async def list_sessions(user_id: str | None = None, limit: int = 50, user: Curre
 
 
 @router.post("/sessions", tags=["会话"])
-async def create_session(user_id: str | None = None, title: str = "新对话", user: CurrentUser = Depends(get_current_user)):
+async def create_session(
+    user_id: str | None = None,
+    title: str = Query("新对话", max_length=256),
+    user: CurrentUser = Depends(get_current_user),
+):
     """新建会话，返回 thread_id（按租户）。"""
     from app.services.session_service import get_session_service
 
@@ -279,38 +302,60 @@ async def create_session(user_id: str | None = None, title: str = "新对话", u
 
 @router.get("/sessions/{thread_id}", tags=["会话"])
 async def get_session(thread_id: str, user: CurrentUser = Depends(get_current_user)):
-    """获取单个会话信息（按租户校验归属）。"""
+    """获取单个会话信息（按租户 + 归属人校验）。"""
     from app.services.session_service import get_session_service
 
-    session = await get_session_service().get_session(thread_id, tenant_id=user.tenant_id)
+    session = await get_session_service().get_session(
+        thread_id, tenant_id=user.tenant_id, user_id=_session_owner(user),
+    )
     if session is None:
-        return {"error": "not_found"}
+        raise NotFoundError("会话不存在")
     return session
 
 
 @router.patch("/sessions/{thread_id}", tags=["会话"])
-async def rename_session(thread_id: str, title: str, user: CurrentUser = Depends(get_current_user)):
-    """重命名会话（按租户校验归属）。"""
+async def rename_session(
+    thread_id: str,
+    title: str = Query(..., max_length=256),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """重命名会话（按租户 + 归属人校验）。"""
     from app.services.session_service import get_session_service
 
-    ok = await get_session_service().rename_session(thread_id, title, tenant_id=user.tenant_id)
-    return {"status": "ok" if ok else "not_found"}
+    ok = await get_session_service().rename_session(
+        thread_id, title, tenant_id=user.tenant_id, user_id=_session_owner(user),
+    )
+    if not ok:
+        raise NotFoundError("会话不存在")
+    return {"status": "ok"}
 
 
 @router.delete("/sessions/{thread_id}", tags=["会话"])
 async def delete_session(thread_id: str, user: CurrentUser = Depends(get_current_user)):
-    """删除会话（按租户校验归属，含清理状态）。"""
+    """删除会话（按租户 + 归属人校验，含清理状态）。"""
     from app.services.session_service import get_session_service
 
-    ok = await get_session_service().delete_session(thread_id, tenant_id=user.tenant_id)
-    return {"status": "ok" if ok else "not_found"}
+    ok = await get_session_service().delete_session(
+        thread_id, tenant_id=user.tenant_id, user_id=_session_owner(user),
+    )
+    if not ok:
+        raise NotFoundError("会话不存在")
+    return {"status": "ok"}
 
 
 # ==================== Hermes 自我进化 ====================
 
 
+# 以下 /evolution/* 全部是管理面接口：它们能改写**全局**系统提示词
+# （影响所有用户的所有会话），必须限管理员。
+
+
 @router.post("/evolution/reflect", tags=["Hermes 进化"])
-async def evolution_reflect(sample_limit: int = 5, auto_apply_threshold: float = 6.0):
+async def evolution_reflect(
+    sample_limit: int = Query(5, ge=1, le=50),
+    auto_apply_threshold: float = Query(6.0, ge=0.0, le=10.0),
+    _: CurrentUser = Depends(require_admin),
+):
     """手动触发 Hermes 反思循环：回顾近期对话 → 自评 → 优化提示词。
 
     能力 B（主动进化）。评估达标（>= auto_apply_threshold）则自动采纳为新版本。
@@ -326,7 +371,7 @@ async def evolution_reflect(sample_limit: int = 5, auto_apply_threshold: float =
 
 
 @router.get("/evolution/prompt", tags=["Hermes 进化"])
-async def evolution_get_prompt():
+async def evolution_get_prompt(_: CurrentUser = Depends(require_admin)):
     """查看当前生效的系统提示词及其版本。"""
     from app.evolution.prompt_store import get_current_prompt, get_current_version
 
@@ -337,7 +382,9 @@ async def evolution_get_prompt():
 
 
 @router.get("/evolution/versions", tags=["Hermes 进化"])
-async def evolution_list_versions(limit: int = 20):
+async def evolution_list_versions(
+    limit: int = Query(20, ge=1, le=200), _: CurrentUser = Depends(require_admin),
+):
     """列出提示词的历史版本。"""
     from app.evolution.prompt_store import list_versions
 
@@ -346,7 +393,7 @@ async def evolution_list_versions(limit: int = 20):
 
 
 @router.post("/evolution/rollback/{version}", tags=["Hermes 进化"])
-async def evolution_rollback(version: str):
+async def evolution_rollback(version: str, _: CurrentUser = Depends(require_admin)):
     """回滚到指定提示词版本。"""
     from app.evolution.prompt_store import rollback
 
@@ -358,16 +405,28 @@ async def evolution_rollback(version: str):
 
 
 @router.get("/stats/usage", tags=["统计"])
-async def usage_stats(user_id: str | None = None, days: int = 7):
-    """获取 token 用量与成本统计。"""
+async def usage_stats(
+    user_id: str | None = None,
+    days: int = Query(7, ge=1, le=365),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """获取 token 用量与成本统计。
+
+    普通用户只能看自己的；管理员可以指定 user_id 或看全租户汇总。
+    """
     from app.services.stats_service import get_stats_service
 
-    return await get_stats_service().get_usage_stats(user_id=user_id, days=days)
+    if not user.is_admin and user.is_authenticated:
+        # 非管理员：强制锁定到自己，忽略请求里传的 user_id
+        user_id = user.user_id
+    return await get_stats_service().get_usage_stats(
+        user_id=user_id, days=days, tenant_id=user.tenant_id,
+    )
 
 
 @router.get("/metrics", tags=["系统"])
-async def metrics():
-    """运行时指标（请求数、延迟、基础设施状态）。"""
+async def metrics(_: CurrentUser = Depends(require_admin)):
+    """运行时指标（请求数、延迟、基础设施状态）。仅管理员。"""
     from app.services.observability import get_metrics
 
     return get_metrics()

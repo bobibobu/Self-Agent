@@ -17,13 +17,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, UploadFile, File, Form
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import JSONResponse
 
-from app.auth.dependencies import CurrentUser, get_current_user
+from app.auth.dependencies import CurrentUser, get_current_user, require_admin
 from app.core.config import get_settings
 from app.core.logging import get_logger
 
@@ -39,6 +40,23 @@ _ALLOWED_EXTS = {
 }
 _TEXT_EXTS = {".txt", ".md", ".markdown", ".json", ".csv", ".log", ".py", ".js", ".ts", ".yaml", ".yml", ".xml", ".rst"}
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+
+
+def _prepare_dir(d: Path) -> Path:
+    """建目录并返回其 resolve 后的路径（阻塞操作，由调用方丢线程池）。"""
+    d.mkdir(parents=True, exist_ok=True)
+    return d.resolve()
+
+
+def _list_files(d: Path) -> list[dict]:
+    """列目录（阻塞操作，由调用方丢线程池）。"""
+    if not d.exists():
+        return []
+    return [
+        {"name": f.name, "size_bytes": f.stat().st_size}
+        for f in d.iterdir()
+        if f.is_file()
+    ]
 
 
 @router.post("/upload", tags=["文件"])
@@ -68,14 +86,16 @@ async def upload_file(
         return JSONResponse(status_code=413, content={"error": "文件过大", "max_mb": s.upload_max_size_mb})
 
     # 保存（uuid 前缀防重名）
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    upload_dir_resolved = upload_dir.resolve()
+    # 文件系统操作全部丢到线程池：mkdir/resolve/write_bytes 都是阻塞调用，
+    # 直接在 async handler 里跑会卡住整个事件循环——写一个 20MB 的文件期间，
+    # 所有其他请求（包括正在流式输出的对话）都会被顶住。
+    upload_dir_resolved = await asyncio.to_thread(_prepare_dir, upload_dir)
     saved_name = f"{uuid.uuid4().hex[:8]}_{safe_basename}"
-    saved_path = (upload_dir / saved_name).resolve()
+    saved_path = await asyncio.to_thread(lambda: (upload_dir / saved_name).resolve())
     # 精确校验：保存路径的父目录必须等于 upload_dir（防穿越，比 startswith 可靠）
     if saved_path.parent != upload_dir_resolved:
         return JSONResponse(status_code=400, content={"error": "路径校验失败"})
-    saved_path.write_bytes(content)
+    await asyncio.to_thread(saved_path.write_bytes, content)
 
     # 不返回服务器绝对路径，只返回相对 URL
     result = {
@@ -94,7 +114,9 @@ async def upload_file(
             result["is_text"] = True
             if auto_ingest and kb_id:
                 from app.rag.service import get_rag_service
-                chunks = await get_rag_service().ingest(kb_id, text, source=safe_basename)
+                chunks = await get_rag_service().ingest(
+                    kb_id, text, source=safe_basename, tenant_id=user.tenant_id,
+                )
                 result["ingested_chunks"] = chunks
                 result["kb_id"] = kb_id
                 logger.info("文件 %s 已入 RAG（%d 块）", safe_basename, chunks)
@@ -109,14 +131,11 @@ async def upload_file(
 
 
 @router.get("/uploads", tags=["文件"])
-async def list_uploads(user: CurrentUser = Depends(get_current_user)):
-    """列出已上传文件（需认证）。"""
-    s = get_settings()
-    upload_dir = Path(s.upload_dir)
-    if not upload_dir.exists():
-        return {"files": []}
-    files = []
-    for f in upload_dir.iterdir():
-        if f.is_file():
-            files.append({"name": f.name, "size_bytes": f.stat().st_size})
+async def list_uploads(user: CurrentUser = Depends(require_admin)):
+    """列出已上传文件。
+
+    限管理员：上传目录是所有租户共用的扁平目录，没有按用户/租户分区，
+    普通用户能列出他人上传的文件名。在做完按用户分目录之前，先收紧权限。
+    """
+    files = await asyncio.to_thread(_list_files, Path(get_settings().upload_dir))
     return {"count": len(files), "files": files}

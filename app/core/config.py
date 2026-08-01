@@ -13,7 +13,6 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -50,7 +49,17 @@ class Settings(BaseSettings):
     # Anthropic
     anthropic_api_key: str = ""
     anthropic_base_url: str = "https://api.anthropic.com"
-    anthropic_model: str = "claude-3-5-haiku-latest"
+    anthropic_model: str = "claude-haiku-4-5-20251001"
+
+    # LLM 调用超时（秒）与重试次数。没有超时的话单次卡死会一直占着连接。
+    llm_timeout_seconds: float = 60.0
+    llm_max_retries: int = 2
+
+    # ---------- 向量化（长期记忆 / RAG 的语义检索）----------
+    # auto：跟随默认 LLM provider 自动选；none：强制用哈希伪向量（仅调试）
+    embedding_provider: Literal["auto", "glm", "openai", "none"] = "auto"
+    embedding_model: str = ""   # 留空用 provider 默认（glm: embedding-3 / openai: text-embedding-3-small）
+    embedding_dims: int = 0     # 留空用 provider 默认（glm: 2048 / openai: 1536）
 
     # ---------- PostgreSQL ----------
     postgres_host: str = "localhost"
@@ -58,6 +67,8 @@ class Settings(BaseSettings):
     postgres_user: str = "selfagent"
     postgres_password: str = "selfagent123"
     postgres_db: str = "selfagent"
+    # LangGraph checkpointer/store 共享连接池的上限
+    postgres_pool_max_size: int = 10
 
     # ---------- MongoDB ----------
     mongo_host: str = "localhost"
@@ -86,6 +97,12 @@ class Settings(BaseSettings):
     mcp_server_enabled: bool = False
     mcp_server_port: int = 9000
 
+    # ---------- Agent ----------
+    # agent↔tools 循环的最大步数（每个工具回合消耗 2 步）
+    agent_recursion_limit: int = 25
+    # 单个工具结果注入上下文的最大字符数（防止某个工具返回 1MB 撑爆上下文）
+    tool_result_max_chars: int = 4000
+
     # ---------- Skill 系统 ----------
     skills_enabled: bool = True
 
@@ -111,9 +128,18 @@ class Settings(BaseSettings):
     # 是否启用认证（dev 可关闭，便于调试；生产必须开）
     auth_enabled: bool = False
 
+    # 管理员用户名（逗号分隔）。登录时写入 token 的 role claim，
+    # 决定谁能调用 /evolution、/stats、/metrics 等管理面接口。
+    admin_usernames: str = ""
+
     # ---------- 多租户 ----------
     # 是否启用多租户隔离（启用后数据按 tenant_id 隔离）
     multi_tenant_enabled: bool = False
+    # 允许的租户 ID（逗号分隔）。多租户启用时，客户端声明的租户必须在此名单内，
+    # 否则拒绝——防止任意注册进他人租户。名单为空则只允许 default。
+    tenant_allowlist: str = ""
+    # 客户端声明租户用的请求头（仅多租户启用时生效）
+    tenant_header: str = "X-Tenant-Id"
 
     # ---------- 限流 ----------
     rate_limit_enabled: bool = True

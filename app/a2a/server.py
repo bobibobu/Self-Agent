@@ -28,13 +28,13 @@ def mount_a2a(app: FastAPI, base_url: str = "http://localhost:8000") -> bool:
     """
     try:
         from a2a.server.request_handlers import DefaultRequestHandler
-        from a2a.server.tasks import InMemoryTaskStore
         from a2a.server.routes import (
             create_agent_card_routes,
             create_jsonrpc_routes,
             create_rest_routes,
         )
         from a2a.server.routes.fastapi_routes import add_a2a_routes_to_fastapi
+        from a2a.server.tasks import InMemoryTaskStore
     except ImportError as e:
         logger.warning("A2A 模块不可用，跳过挂载：%s", e)
         return False

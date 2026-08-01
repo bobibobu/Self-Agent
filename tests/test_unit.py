@@ -183,12 +183,12 @@ class TestMemory:
 
     @pytest.mark.asyncio
     async def test_hash_embed(self):
-        from app.memory.store import _hash_embed
-        vecs = _hash_embed(["hello", "world"])
+        from app.memory.embeddings import hash_embed
+        vecs = hash_embed(["hello", "world"])
         assert len(vecs) == 2
         assert len(vecs[0]) == len(vecs[1])  # 同维度
         # 相同输入得相同输出
-        assert _hash_embed(["abc"]) == _hash_embed(["abc"])
+        assert hash_embed(["abc"]) == hash_embed(["abc"])
 
     @pytest.mark.asyncio
     async def test_memory_add_search(self):
@@ -197,6 +197,28 @@ class TestMemory:
         await mem.add_memory("test_user", "用户喜欢 Python")
         results = await mem.search_memory("test_user", "编程偏好")
         assert any("Python" in r["content"] for r in results)
+
+    @pytest.mark.asyncio
+    async def test_get_all_memories_returns_written_items(self):
+        """回归：get_all_memories 曾用 aget(ns, limit=) 调用，签名不存在 →
+        TypeError 被 except 吞掉 → 无论写入多少条都返回空列表。"""
+        from app.memory.store import get_memory_service
+
+        mem = await get_memory_service()
+        await mem.add_memory("list_user", "事实一", key="k1")
+        await mem.add_memory("list_user", "事实二", key="k2")
+        all_items = await mem.get_all_memories("list_user")
+        contents = {m["content"] for m in all_items}
+        assert {"事实一", "事实二"} <= contents, f"应列出全部记忆，实际 {all_items}"
+
+    @pytest.mark.asyncio
+    async def test_delete_memory_removes_it(self):
+        from app.memory.store import get_memory_service
+
+        mem = await get_memory_service()
+        await mem.add_memory("del_user", "待删除", key="gone")
+        await mem.delete_memory("del_user", "gone")
+        assert all(m["key"] != "gone" for m in await mem.get_all_memories("del_user"))
 
 
 # ==================== 7. 用户画像（内存兜底）====================

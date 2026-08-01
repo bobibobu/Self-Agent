@@ -39,11 +39,19 @@ class AnthropicClient:
         api_key: str,
         base_url: str,
         default_model: str,
+        timeout: float | None = None,
+        max_retries: int | None = None,
     ) -> None:
         if not api_key:
             raise LLMError("anthropic 缺少 api_key", provider="anthropic")
         self._default_model = default_model
-        self._client = AsyncAnthropic(api_key=api_key, base_url=base_url)
+        # 同 OpenAI provider：超时与重试交给 SDK 内置机制
+        self._client = AsyncAnthropic(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout if timeout is not None else 60.0,
+            max_retries=max_retries if max_retries is not None else 2,
+        )
 
     @property
     def provider_name(self) -> str:
@@ -68,7 +76,6 @@ class AnthropicClient:
                 if m.content:
                     blocks.append({"type": "text", "text": m.content})
                 for tc in m.tool_calls:
-                    import json
 
                     blocks.append({
                         "type": "tool_use",
@@ -105,7 +112,6 @@ class AnthropicClient:
 
     def _parse_response(self, resp, model: str) -> ChatResponse:
         """把 Anthropic 响应转成统一 ChatResponse。"""
-        import json
 
         content_text: list[str] = []
         tool_calls: list[ToolCall] = []
@@ -155,7 +161,13 @@ class AnthropicClient:
         return self._parse_response(resp, model)
 
     async def stream_chat(self, request: ChatRequest):
-        """流式对话。Anthropic 用 events 流，这里聚合为 StreamChunk。"""
+        """流式对话。Anthropic 用 events 流，这里聚合为 StreamChunk。
+
+        SDK 的 get_final_message() 已经帮我们把 tool_use block 的
+        input_json_delta 聚合好了，直接复用 _parse_response 解析即可——
+        原实现拿到 final 却只取了 stop_reason，把 tool_use 丢了，
+        所以上层才不得不再补一次非流式调用。
+        """
         model = request.model or self._default_model
         system, msgs = self._split_system(request.messages)
         try:
@@ -170,6 +182,14 @@ class AnthropicClient:
                 async for text in stream.text_stream:
                     yield StreamChunk(content=text)
                 final = await stream.get_final_message()
-                yield StreamChunk(finish_reason=final.stop_reason)
         except Exception as e:
             raise LLMError(f"anthropic 流式调用失败: {e}", provider="anthropic") from e
+
+        parsed = self._parse_response(final, model)
+        yield StreamChunk(
+            content="",
+            tool_calls=parsed.tool_calls or None,
+            finish_reason=parsed.finish_reason,
+            usage=parsed.usage,
+            model=model,
+        )

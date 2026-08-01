@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from app.auth.jwt_service import hash_password, verify_password
 from app.core.logging import get_logger
@@ -99,7 +99,7 @@ class UserService:
         return d
 
 
-_user_service: Optional[UserService] = None
+_user_service: UserService | None = None
 
 
 def get_user_service() -> UserService:

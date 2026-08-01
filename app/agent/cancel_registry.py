@@ -16,7 +16,6 @@ LangGraph 的 astream 内部管理自己的任务，外部直接 cancel 不一�
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
 
 # thread_id → 取消事件（set 表示已请求取消）
 _cancel_events: dict[str, asyncio.Event] = {}

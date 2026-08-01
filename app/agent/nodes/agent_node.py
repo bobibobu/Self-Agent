@@ -9,18 +9,18 @@ Agent 节点
 graph.astream(stream_mode=["custom","updates"], version="v2") 实时收到。
 
 实现说明：
-- 流式文本通过 stream_chat 逐 token 推送（真·流式，不等节点结束）
-- 工具调用决策：流式过程中 OpenAI/Anthropic 的 tool_calls 是增量跨 chunk 的，
-  难以可靠聚合。为正确路由，这里在文本流完后用一次非流式 chat() 复查 tool_calls。
-  代价是多一次 LLM 调用，换来 ReAct 路由的可靠性。
-  （优化方向：后续可改为聚合流式 tool_call 增量，省掉复查）
+- 一次流式调用同时拿到文本与 tool_calls。tool_call 的跨 chunk 增量由各
+  provider 在 stream_chat 内部按 index 聚合完再吐出来（见 llm/providers/）。
+- 系统提示由 config["configurable"]["system_prompt"] 传入，只拼进「发给 LLM
+  的这一份」消息列表，不写回 state——否则 add_messages 每轮追加一条，
+  第 N 轮的 prompt 里就有 N 份系统提示。
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import StreamWriter
 
@@ -37,53 +37,64 @@ async def agent_node(state: AgentState, config: RunnableConfig, writer: StreamWr
 
     返回 {"messages": [AIMessage]}，由 add_messages reducer 追加。
     """
-    tools = config.get("configurable", {}).get("tools", [])
+    configurable = config.get("configurable", {})
+    tools = configurable.get("tools", [])
+    system_prompt = configurable.get("system_prompt")
+
     # 上下文窗口管理：消息过长时自动压缩早期消息为摘要
     from app.agent.context_manager import compress_if_needed
     messages = await compress_if_needed(state["messages"])
+
+    # 系统提示只在「发给 LLM 的这一份」里出现，不写回 state——
+    # 否则 add_messages 每轮追加一条，历史里会堆积 N 份系统提示
+    if system_prompt:
+        messages = [SystemMessage(content=system_prompt), *messages]
+
     request = build_chat_request(messages, tools)
     llm = get_llm_client()
 
     logger.debug("agent_node 调用 %s，消息数=%d", llm.provider_name, len(request.messages))
 
-    # 流式收集文本 token，逐个推送（真·流式）
+    # 单次流式调用同时拿到文本与 tool_calls。
+    #
+    # 这里原本是「先 stream_chat 出文本，再 chat() 复查 tool_calls」——
+    # 两次独立采样，成本和延迟翻倍，而且两次结果可能不一致：流式已经把完整
+    # 答案推给用户了，复查却决定调工具，界面上就会出现「答案 → 工具 → 第二个答案」。
+    # 现在由各 provider 在流内聚合 tool_call 增量（见 providers/*.stream_chat）。
     content_parts: list[str] = []
-    finish_reason = ""
+    tool_calls_list: list = []
+    usage = None
+    model_name = ""
     async for chunk in llm.stream_chat(request):
         if chunk.content:
             content_parts.append(chunk.content)
             writer({"type": "token", "text": chunk.content})
-        if chunk.finish_reason:
-            finish_reason = chunk.finish_reason
+        if chunk.tool_calls:
+            tool_calls_list = chunk.tool_calls
+        if chunk.usage:
+            usage = chunk.usage
+        if chunk.model:
+            model_name = chunk.model
 
     full_text = "".join(content_parts)
-
-    # 工具调用决策：用一次非流式调用可靠获取 tool_calls
-    # （流式的 tool_calls 增量跨 chunk，聚合逻辑因 provider 而异，不可靠）
-    resp = await llm.chat(request)
-    tool_calls_list = resp.tool_calls
-    # 若流式有文本但非流式无文本，保留流式文本
-    if not full_text and resp.content:
-        full_text = resp.content
-        # 这种情况（非流式有文本但流式没收到）推送一次完整文本
-        writer({"type": "token", "text": full_text})
 
     # 构造 AIMessage
     msg_kwargs: dict[str, Any] = {
         "content": full_text,
         "additional_kwargs": {
-            "model": resp.model,
-            "usage": resp.usage.model_dump() if resp.usage else {},
+            "model": model_name,
+            "usage": usage.model_dump() if usage else {},
             "provider": llm.provider_name,
         },
     }
-    tool_calls = [
-        {"id": tc.id, "name": tc.name, "args": tc.arguments}
-        for tc in tool_calls_list
-    ]
-    if tool_calls:
-        msg_kwargs["tool_calls"] = tool_calls
-        writer({"type": "tool_calls", "calls": [{"name": tc.name, "args": tc.arguments} for tc in tool_calls_list]})
+    if tool_calls_list:
+        msg_kwargs["tool_calls"] = [
+            {"id": tc.id, "name": tc.name, "args": tc.arguments} for tc in tool_calls_list
+        ]
+        writer({
+            "type": "tool_calls",
+            "calls": [{"name": tc.name, "args": tc.arguments} for tc in tool_calls_list],
+        })
 
     ai_msg = AIMessage(**msg_kwargs)
     return {"messages": [ai_msg]}
