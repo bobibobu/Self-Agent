@@ -1,0 +1,32 @@
+{
+  "_comment": "外部 MCP server 连接配置。MultiServerMCPClient 会按此连接并发现工具。",
+  "_comment2": "transport 支持: stdio（本地子进程）/ http（streamable-http 远程）/ sse（旧版 SSE 远程）",
+  "_comment3": "enabled=false 的 server 会被跳过，不影响其他 server",
+  "_comment4": "把本文件复制为 mcp_servers.json 后修改；mcp_servers.json 已在 .gitignore",
+
+  "servers": {
+
+    "self_tools": {
+      "_comment": "示例：连接本项目的内置 MCP server（演示 stdio 传输）。启动它：python -m app.mcp.server",
+      "enabled": false,
+      "transport": "stdio",
+      "command": "python",
+      "args": ["-m", "app.mcp.server"]
+    },
+
+    "filesystem": {
+      "_comment": "示例：官方文件系统 MCP server（需 npm i -g @modelcontextprotocol/server-filesystem）",
+      "enabled": false,
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    },
+
+    "remote_example": {
+      "_comment": "示例：远程 streamable-http MCP server",
+      "enabled": false,
+      "transport": "http",
+      "url": "http://localhost:9000/mcp"
+    }
+  }
+}

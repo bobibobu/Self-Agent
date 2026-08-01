@@ -1,0 +1,117 @@
+# ===================================================================
+# Self-Agent 基础设施 —— 一键起齐 4 个数据库
+# -------------------------------------------------------------------
+# 启动：  docker compose up -d
+# 停止：  docker compose down
+# 清空：  docker compose down -v   （删除数据卷）
+# 状态：  docker compose ps
+# 日志：  docker compose logs -f postgres
+#
+# 所有数据持久化到 ./data/ 目录，方便学习与排查。
+# 详细组件说明见 infra/README.md
+# ===================================================================
+
+name: self-agent
+
+services:
+
+  # -----------------------------------------------------------------
+  # PostgreSQL —— 主库
+  #   用途：LangGraph 短期记忆(checkpointer)、长期记忆(store)、
+  #         用户/租户等核心业务数据。
+  #   为什么用它：LangGraph 官方原生支持 Postgres checkpointer，
+  #             且支持事务与向量检索(pgvector)。
+  # -----------------------------------------------------------------
+  postgres:
+    image: docker.1panel.live/library/postgres:16-alpine
+    container_name: selfagent-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: selfagent
+      POSTGRES_PASSWORD: selfagent123
+      POSTGRES_DB: selfagent
+      # 时区
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U selfagent -d selfagent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # -----------------------------------------------------------------
+  # MongoDB —— 文档型日志库
+  #   用途：对话原始事件、结构化日志、非结构化文档（Phase 3）。
+  #   为什么用它：灵活 schema，适合存"形态多变"的事件流。
+  # -----------------------------------------------------------------
+  mongo:
+    image: docker.1panel.live/library/mongo:7
+    container_name: selfagent-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: selfagent
+      MONGO_INITDB_ROOT_PASSWORD: selfagent123
+      MONGO_INITDB_DATABASE: selfagent
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./data/mongo:/data/db
+      - ./mongo/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # -----------------------------------------------------------------
+  # Redis —— 缓存与临时态
+  #   用途：LLM 响应缓存、限流计数器、会话级临时态、分布式锁。
+  #   为什么用它：内存级延迟，单线程模型简单可靠。
+  # -----------------------------------------------------------------
+  redis:
+    image: docker.1panel.live/library/redis:7-alpine
+    container_name: selfagent-redis
+    restart: unless-stopped
+    # 生产环境应通过 requirepass 设置密码，这里开发态留空
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # -----------------------------------------------------------------
+  # Neo4j —— 图数据库
+  #   用途：用户画像、实体关系知识图谱、Agent 间的协作拓扑（Phase 3+）。
+  #   为什么用它：天然适合表达"实体—关系"，关系型数据库 JOIN 会很重。
+  # -----------------------------------------------------------------
+  neo4j:
+    image: docker.1panel.live/library/neo4j:5-community
+    container_name: selfagent-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/selfagent123
+      # 关闭需要付费的功能，保持社区版纯净
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
+      NEO4J_apoc_export_file_enabled: "true"
+      NEO4J_apoc_import_file_enabled: "true"
+      TZ: Asia/Shanghai
+    ports:
+      - "7474:7474"   # 浏览器控制台 http://localhost:7474
+      - "7687:7687"   # Bolt 协议（应用连接用）
+    volumes:
+      - ./data/neo4j:/data
+      - ./data/neo4j-logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10

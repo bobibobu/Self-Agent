@@ -1,0 +1,69 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ===== 虚拟环境 =====
+.venv/
+venv/
+env/
+ENV/
+
+# ===== uv =====
+uv.lock
+
+# ===== 测试 / 类型 / 覆盖率 =====
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+coverage.xml
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ===== 环境变量与密钥（绝不提交）=====
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets/
+
+# ===== 运行时配置（含本地 MCP server 连接，可能含敏感地址）=====
+mcp_servers.json
+
+# ===== 基础设施数据卷（infra/data 下）=====
+infra/data/
+
+# ===== 运行时产物 =====
+*.log
+logs/
+*.pid

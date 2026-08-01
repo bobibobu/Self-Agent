@@ -1,0 +1,93 @@
+[project]
+name = "self-agent"
+version = "0.1.0"
+description = "企业级 AI Agent —— LangGraph + MCP + A2A + 多协议 LLM(GLM/OpenAI/Anthropic)"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Self-Agent" }]
+license = { text = "MIT" }
+
+dependencies = [
+    # --- Web 框架 ---
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sse-starlette>=2.1.0",
+
+    # --- LLM 协议层（多 provider 统一）---
+    "openai>=1.50.0",        # GLM / OpenAI 走 OpenAI 兼容协议
+    "anthropic>=0.40.0",     # Anthropic 原生协议
+
+    # --- Agent 编排 ---
+    "langgraph>=1.2.0",
+    "langgraph-checkpoint-postgres>=3.1.0",
+    "langchain-core>=1.3.3", # 1.x 主线；提供消息类型与 @tool 装饰器；adapters 要求 >=1.3.3
+
+    # --- MCP 协议 ---
+    # 注意：mcp 锁定 1.x（最新 1.29.0）。原因：langchain-mcp-adapters 0.3.1
+    # （PyPI 最新 + GitHub main 分支）仍使用 mcp 1.x 的 RequestContext，
+    # 尚未适配 mcp 2.0（2026-07 大重构版）。待官方适配后可解除 <2.0 约束。
+    "mcp>=1.24.0,<2.0",
+    "langchain-mcp-adapters>=0.3.1",  # MCP 工具 ↔ LangChain BaseTool 官方桥接
+
+    # --- A2A 协议（Agent 间协作）---
+    "a2a-sdk>=1.1.0",
+
+    # --- 数据库驱动（异步）---
+    "asyncpg>=0.30.0",       # PostgreSQL async（业务数据）
+    "psycopg[binary]>=3.2",  # PostgreSQL sync（LangGraph PostgresSaver/PostgresStore 用，含 C 实现免 libpq）
+    "pymongo>=4.9.0",        # MongoDB async driver（PyMongo 4.9+ 原生 async，替代已 EOL 的 motor）
+    "redis>=5.0.0",          # Redis async
+    "neo4j>=5.25.0",         # Neo4j (官方 async driver)
+
+    # --- 配置与校验 ---
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.5.0",
+    "PyJWT>=2.9.0",            # JWT 认证
+    "bcrypt>=4.0.0",           # 密码哈希（直接用，不依赖已停维的 passlib）
+
+    # --- 工具库 ---
+    "httpx>=0.27.0",
+    "tenacity>=9.0.0",       # 重试
+    "python-dotenv>=1.0.0",
+    "orjson>=3.10.0",
+    "numpy>=2.0.0",          # LangGraph InMemoryStore 语义检索的向量运算加速（运行时依赖）
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.7.0",
+    "mypy>=1.13.0",
+    "ipython>=8.28.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+# ---------- uv 配置 ----------
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.7.0",
+]
+
+# ---------- Ruff ----------
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
+ignore = ["E501"]  # 行宽由 formatter 管
+
+# ---------- pytest ----------
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
