@@ -19,11 +19,27 @@ trace_id_var: ContextVar[str] = ContextVar("trace_id", default="-")
 
 
 class TraceIdFilter(logging.Filter):
-    """把当前 trace_id 注入到每条日志记录中。"""
+    """把当前 trace_id 注入到每条日志记录中。
+
+    优先用 OpenTelemetry 活动 span 的 trace_id：这样同一个 id 既能在日志里
+    grep，也能直接在 Jaeger/Tempo 里搜到对应的调用树，日志与链路对得上。
+    没有活动 span（未启用追踪、或在后台任务里）时回退到自己生成的 id。
+    """
 
     def filter(self, record: logging.LogRecord) -> bool:
-        record.trace_id = trace_id_var.get()
+        record.trace_id = _otel_trace_id() or trace_id_var.get()
         return True
+
+
+def _otel_trace_id() -> str | None:
+    """取当前 OTel span 的 trace_id，未启用追踪时返回 None。"""
+    try:
+        from app.core.telemetry import current_trace_id
+
+        return current_trace_id()
+    except Exception:  # noqa: BLE001
+        # 日志过滤器绝不能抛异常，否则每条日志都会炸
+        return None
 
 
 def _build_formatter() -> logging.Formatter:

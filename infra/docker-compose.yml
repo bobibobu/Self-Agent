@@ -92,6 +92,30 @@ services:
       retries: 10
 
   # -----------------------------------------------------------------
+  # Jaeger —— 链路追踪后端（OTLP 接收 + Web UI）
+  #   用途：看一次对话的完整 span 树（LLM 调用、工具执行、RAG 检索的
+  #         父子关系与各自耗时），排查「为什么慢 / 为什么答错」。
+  #   UI： http://localhost:16686
+  #   应用侧只需 OTEL_ENABLED=true（默认已指向 http://localhost:4318）。
+  #   all-in-one 是内存存储，重启丢数据——开发够用，生产要换带持久化的部署。
+  # -----------------------------------------------------------------
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    container_name: selfagent-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # Web UI
+      - "4318:4318"     # OTLP/HTTP 接收端点（应用往这里发 span）
+      - "4317:4317"     # OTLP/gRPC（备用）
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:16686 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # -----------------------------------------------------------------
   # Neo4j —— 图数据库
   #   用途：用户画像、实体关系知识图谱、Agent 间的协作拓扑（Phase 3+）。
   #   为什么用它：天然适合表达"实体—关系"，关系型数据库 JOIN 会很重。

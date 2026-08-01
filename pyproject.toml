@@ -51,6 +51,15 @@ dependencies = [
     "PyJWT>=2.9.0,<3.0",           # JWT 认证
     "bcrypt>=4.0.0,<6.0",          # 密码哈希（直接用，不依赖已停维的 passlib）
 
+    # --- 可观测（OpenTelemetry）---
+    # api/sdk 走稳定的 1.x；instrumentation 系列仍是 0.x beta（跟随 sdk 发布，
+    # 版本号是 0.<sdk_minor>b0 的形式），所以上界放到 <1.0。
+    "opentelemetry-api>=1.44.0,<2.0",
+    "opentelemetry-sdk>=1.44.0,<2.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.44.0,<2.0",
+    "opentelemetry-instrumentation-fastapi>=0.65b0,<1.0",
+    "opentelemetry-instrumentation-httpx>=0.65b0,<1.0",
+
     # --- 工具库 ---
     "httpx>=0.27.0,<1.0",
     "python-dotenv>=1.0.0,<2.0",

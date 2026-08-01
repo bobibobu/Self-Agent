@@ -69,6 +69,10 @@ class OpenAILikeClient:
     def provider_name(self) -> str:
         return self._provider
 
+    @property
+    def default_model(self) -> str:
+        return self._default_model
+
     # ---------- 消息格式转换 ----------
     def _to_openai_messages(self, messages: list[ChatMessage]) -> list[dict[str, Any]]:
         """把统一 ChatMessage 转成 OpenAI 接口要求的 dict。"""

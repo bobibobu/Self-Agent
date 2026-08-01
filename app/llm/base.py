@@ -21,6 +21,15 @@ class LLMClient(Protocol):
         """provider 标识，如 'glm' / 'openai' / 'anthropic'。"""
         ...
 
+    @property
+    def default_model(self) -> str:
+        """未在请求里显式指定 model 时使用的默认模型名。
+
+        追踪层要用它给 span 命名（GenAI 约定是 `chat {model}`）。
+        暴露成协议的一部分，免得调用方去摸各实现的私有属性。
+        """
+        ...
+
     async def chat(self, request: ChatRequest) -> ChatResponse:
         """一次性（非流式）对话。"""
         ...

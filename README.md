@@ -13,6 +13,7 @@
 - **A2A 协议互通**：基于 Google/Linux Foundation 的 A2A 标准，实现 Agent 间发现与协作
 - **多类型记忆系统**：PostgreSQL(对话状态/长期记忆) + Redis(缓存) + Neo4j(用户画像图谱) + MongoDB(日志)
 - **企业级工程化**：全程类型注解、结构化日志、配置即代码、Docker 一键起所有基础设施
+- **可观测**：OpenTelemetry 链路追踪，一轮对话的 LLM 调用 / 工具执行 / 检索耗时一目了然
 
 ## 🏗 技术栈
 
@@ -23,11 +24,12 @@
 | Web | FastAPI + Uvicorn + SSE 流式 |
 | 数据库 | PostgreSQL · MongoDB · Redis · Neo4j |
 | 协议 | MCP · A2A |
+| 可观测 | OpenTelemetry（GenAI 语义约定）· Jaeger |
 | 包管理 | uv |
 
 ## 🚀 5 分钟快速开始
 
-### 1. 启动基础设施（4 个数据库一键拉起）
+### 1. 启动基础设施（4 个数据库 + Jaeger 一键拉起）
 
 ```bash
 cd infra
@@ -100,7 +102,7 @@ Self-Agent/
 ├── clients/              # ★两套交互前端（各自独立）
 │   ├── web/              #   Web 聊天页（React + Vite + SSE）
 │   └── cli/              #   命令行客户端（rich + NDJSON，类 Claude Code）
-├── infra/                # 基础设施（Docker 化的 4 个数据库）
+├── infra/                # 基础设施（4 个数据库 + Jaeger，Docker 一键起）
 ├── docs/                 # 全部文档（架构/模块/开发/面试）
 ├── scripts/              # 验证脚本
 └── tests/                # 测试（单元 + 集成）
@@ -145,6 +147,37 @@ curl -X POST http://localhost:8000/chat/http-stream ... # NDJSON 流式
 - [x] **Phase 7** —— ★会话管理（CRUD）+ dev 持久化 + 上下文压缩 + 流式中断
 - [x] **Phase 8** —— ★用户认证(JWT) + 多租户 + 限流 + RAG知识库 + 文件上传 + 用量统计 + 可观测
 
+## 🔭 链路追踪
+
+打开 `OTEL_ENABLED=true`，每轮对话产出一棵 span 树，Jaeger UI 在 http://localhost:16686
+
+```
+agent.turn                        5078.2ms
+├─ graph.compile                  5061.4ms   ← 首次请求才有（已在启动时预热）
+├─ context.build                     4.4ms
+│  ├─ rag.retrieve                   0.3ms   chunk_count=3
+│  ├─ memory.search                  0.1ms   memory_hits=2
+│  └─ profile.get                    0.0ms
+├─ chat glm-4.5-flash              820.0ms   input_tokens=312 output_tokens=24 tool_call_count=1
+├─ execute_tool calculator           0.7ms
+└─ chat glm-4.5-flash              610.0ms   input_tokens=381 output_tokens=17
+```
+
+它能直接回答几个平时只能靠猜的问题：**首字延迟是卡在检索还是卡在模型**、
+**一个 turn 到底调了几次 LLM**（历史上这里有过「每轮调两次」的退化）、
+**token 花在哪一步**。属性遵循 OpenTelemetry GenAI 语义约定（`gen_ai.*`），
+不绑定特定厂商，换 Grafana Tempo / 任意 OTLP 后端都能直接用。
+
+日志里的 `trace=` 字段会自动取当前 span 的 trace_id，同一个 id
+既能在日志里 grep，也能直接在 Jaeger 里搜到调用树。
+
+> **隐私**：`OTEL_CAPTURE_CONTENT` 默认关闭。prompt/completion 正文可能含
+> 用户隐私、密钥、内部文档内容，需要时再显式打开。
+>
+> **开销**：`OTEL_ENABLED=false` 时全局没有 TracerProvider，所有 span 都是
+> `NonRecordingSpan`（`is_recording=False`），业务代码里的埋点近乎免费，
+> 所以不需要到处写 `if enabled`。
+
 ## 🔧 升级已有环境
 
 `infra/postgres/init.sql` 只在 Postgres 数据卷**首次创建**时执行。已经跑过旧版本的话，
@@ -171,7 +204,7 @@ cd infra && docker compose up -d --force-recreate postgres
 | 领域 | 限制 |
 |---|---|
 | 流式中断 | `cancel_registry` 是进程内字典，多 worker / 多副本下 `/chat/cancel` 只有 1/N 概率命中 |
-| 可观测 | `/metrics` 是进程内计数，非 Prometheus 格式，无法跨副本聚合；无 OpenTelemetry 链路追踪 |
+| 可观测 | 链路追踪已接入（见上），但 `/metrics` 仍是进程内计数、非 Prometheus 格式，无法跨副本聚合 |
 | 提示词版本 | `prompt_store` 落本地文件，多副本状态不一致 |
 | 上传文件 | 扁平目录、无按用户分区；`/uploads` 静态目录本身不鉴权，知道文件名即可下载 |
 | JWT | 无吊销名单，改密码/登出无法使已签发 token 失效（token 里已留 `jti` 锚点） |

@@ -27,6 +27,7 @@ from app.auth.routes import router as auth_router
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import get_logger, setup_logging
+from app.core.telemetry import setup_telemetry, shutdown_telemetry
 from app.db.manager import db_manager
 from app.mcp.client import mcp_client_manager
 from app.rag.routes import router as rag_router
@@ -66,13 +67,21 @@ async def lifespan(app: FastAPI):
         from app.skills.registry import skill_registry
         loaded = skill_registry.load_all_defaults(tool_registry=tool_reg)
         logger.info("✅ Skill 系统已加载（%d 个）", loaded)
-    # 初始化长期记忆 store（预热单例）
+    # 预热记忆层与状态图。
+    # 不预热的话，建连接池、建表、编译图这些一次性成本会全落在第一个真实
+    # 用户请求上——DB 不可用时那是整整一个连接超时（默认 5 秒）。
     try:
         from app.memory.store import get_store
         await get_store()
         logger.info("✅ 长期记忆 store 已就绪")
     except Exception as e:  # noqa: BLE001
         logger.warning("长期记忆 store 初始化失败（不阻断）：%s", e)
+    try:
+        from app.agent.graph import get_compiled_graph
+        await get_compiled_graph()
+        logger.info("✅ Agent 状态图已编译")
+    except Exception as e:  # noqa: BLE001
+        logger.warning("状态图预热失败（首个请求会承担该成本）：%s", e)
     # 挂载 A2A 路由（让本 Agent 可被外部 Agent 发现与调用）
     if settings.a2a_enabled:
         from app.a2a.server import mount_a2a
@@ -106,6 +115,8 @@ async def lifespan(app: FastAPI):
     except Exception as e:  # noqa: BLE001
         logger.warning("关闭 LangGraph 连接池失败：%s", e)
     await db_manager.disconnect()
+    # 最后 flush 追踪数据，否则最后一批 span 会随进程退出丢掉
+    shutdown_telemetry()
     logger.info("✅ 已关闭")
 
 
@@ -136,6 +147,10 @@ app.add_middleware(RateLimitMiddleware)
 from app.services.observability import MetricsMiddleware  # noqa: E402
 
 app.add_middleware(MetricsMiddleware)
+
+# 链路追踪：必须在路由注册前 instrument，否则 FastAPI 自动埋点抓不到路由信息。
+# 未启用（OTEL_ENABLED=false，默认）时这一步是空操作，业务代码里的 span 全是 no-op。
+setup_telemetry(app)
 
 # 异常处理 & 路由
 register_exception_handlers(app)

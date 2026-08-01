@@ -16,11 +16,13 @@ import uuid
 from langchain_core.messages import ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import StreamWriter
+from opentelemetry.trace import StatusCode
 
 from app.agent.registry import get_tool
 from app.agent.state import AgentState
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.core.telemetry import ATTR_TOOL_RESULT_CHARS, ATTR_TOOL_TRUNCATED, record_content, tool_span
 
 logger = get_logger(__name__)
 
@@ -45,21 +47,33 @@ async def _run_one(call: dict, writer: StreamWriter, limit: int) -> ToolMessage:
 
     writer({"type": "tool_start", "name": name, "args": args})
 
-    tool_fn = get_tool(name)
-    if tool_fn is None:
-        logger.warning("未知工具调用: %s", name)
-        output = f"错误：未知工具 '{name}'"
-    else:
-        try:
-            # 统一用 ainvoke：BaseTool 内部自动 dispatch 同步/异步
-            output = await tool_fn.ainvoke(args)
-            logger.info("工具调用 %s%s → %s", name, args, str(output)[:200])
-        except Exception as e:  # noqa: BLE001
-            # 工具失败不该中断整个 ReAct 循环——把错误交回模型，它可以换个参数重试
-            logger.exception("工具 %s 执行异常", name)
-            output = f"工具执行出错：{e}"
+    with tool_span(name=name, call_id=call_id) as sp:
+        record_content(sp, "gen_ai.tool.arguments", str(args))
+        tool_fn = get_tool(name)
+        if tool_fn is None:
+            logger.warning("未知工具调用: %s", name)
+            output = f"错误：未知工具 '{name}'"
+            # 未知工具是真错误（多半是注册表与 LLM 看到的声明不一致），标红
+            sp.set_status(StatusCode.ERROR, f"未知工具 {name}")
+        else:
+            try:
+                # 统一用 ainvoke：BaseTool 内部自动 dispatch 同步/异步
+                output = await tool_fn.ainvoke(args)
+                logger.info("工具调用 %s%s → %s", name, args, str(output)[:200])
+            except Exception as e:  # noqa: BLE001
+                # 工具失败不该中断整个 ReAct 循环——把错误交回模型，它可以换个参数重试。
+                # 但 span 要标红：对模型是「可恢复」，对排查的人是「这里出事了」。
+                logger.exception("工具 %s 执行异常", name)
+                sp.record_exception(e)
+                sp.set_status(StatusCode.ERROR, str(e))
+                output = f"工具执行出错：{e}"
 
-    output_str = _truncate(str(output), limit)
+        raw = str(output)
+        output_str = _truncate(raw, limit)
+        sp.set_attribute(ATTR_TOOL_RESULT_CHARS, len(raw))
+        sp.set_attribute(ATTR_TOOL_TRUNCATED, len(output_str) < len(raw))
+        record_content(sp, "gen_ai.tool.result", output_str)
+
     writer({"type": "tool_result", "name": name, "content": output_str[:500]})
     return ToolMessage(content=output_str, tool_call_id=call_id, name=name)
 

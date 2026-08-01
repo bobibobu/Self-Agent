@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, START, StateGraph
+from opentelemetry.trace import StatusCode
 
 from app.agent.nodes.agent_node import agent_node
 from app.agent.nodes.tools_node import should_use_tools, tools_node
@@ -28,9 +29,35 @@ from app.agent.prompts import SYSTEM_PROMPT
 from app.agent.state import AgentState
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.core.telemetry import (
+    ATTR_CHUNK_COUNT,
+    ATTR_KB_IDS,
+    ATTR_MEMORY_HITS,
+    ATTR_STREAMING,
+    ATTR_TENANT_ID,
+    ATTR_THREAD_ID,
+    ATTR_USER_ID,
+    span,
+)
 from app.memory.checkpointer import get_checkpointer
 
 logger = get_logger(__name__)
+
+
+def _turn_attrs(
+    thread_id: str, tenant_id: str, user_id: str | None, kb_ids: list[str] | None, *, streaming: bool,
+) -> dict:
+    """agent.turn span 的属性。不放消息正文——正文由 record_content 按开关控制。"""
+    attrs = {
+        ATTR_THREAD_ID: thread_id,
+        ATTR_TENANT_ID: tenant_id,
+        ATTR_STREAMING: streaming,
+    }
+    if user_id:
+        attrs[ATTR_USER_ID] = user_id
+    if kb_ids:
+        attrs[ATTR_KB_IDS] = list(kb_ids)
+    return attrs
 
 # 后台任务引用集：持有 create_task 的强引用，防止 GC 在任务完成前回收它
 # （CPython 的 asyncio 任务只有弱引用，不持有会被回收导致静默失败）
@@ -112,44 +139,51 @@ async def run_agent(message: str, thread_id: str, user_id: str | None = None, kb
     # 多租户：thread_id 加租户前缀防跨租户冲突
     scoped_tid = scoped_thread_id(tenant_id, thread_id)
     start = time.time()
-    graph = await get_compiled_graph()
-
-    # 构造系统提示（含 Skill 提示词 + 用户长期记忆 + RAG 上下文，按租户隔离）
-    #
-    # 关键：系统提示走 config 传给 agent_node，**不写进 state["messages"]**。
-    # 原来的写法是 ainvoke({"messages": [system_msg, HumanMessage(...)]})，
-    # 而 messages 的 reducer 是 add_messages（追加语义），于是每轮都会往
-    # checkpoint 里多塞一条系统提示——第 N 轮的 prompt 里就有 N 份完整的
-    # 系统提示（每份还都带着记忆/画像/RAG 上下文），token 呈二次方增长。
-    system_prompt = await _build_system_prompt_with_context(message, user_id, kb_ids, tenant_id)
-    config = {
-        "configurable": {
-            "thread_id": scoped_tid,
-            "tools": get_all_tools(),
-            "system_prompt": system_prompt,
-        },
-        "recursion_limit": get_settings().agent_recursion_limit,  # 防止 agent↔tools 死循环
-    }
 
     error: str | None = None
     reply_text = ""
     usage_info: dict = {}
     provider_info: str | None = None
-    try:
-        result = await graph.ainvoke(
-            {"messages": [HumanMessage(content=message)]},
-            config=config,
-        )
-        ai_reply = result["messages"][-1]
-        reply_text = ai_reply.content if hasattr(ai_reply, "content") else str(ai_reply)
-        # 从最后一条 AI 消息提取 usage/provider（agent_node 存在 additional_kwargs）
-        extra = getattr(ai_reply, "additional_kwargs", {}) or {}
-        usage_info = extra.get("usage", {}) or {}
-        provider_info = extra.get("provider")
-    except Exception as e:  # noqa: BLE001
-        error = str(e)
-        reply_text = f"抱歉，处理时出错了：{e}"
-        logger.exception("Agent 执行异常")
+
+    with span("agent.turn", **_turn_attrs(thread_id, tenant_id, user_id, kb_ids, streaming=False)) as turn:
+        graph = await get_compiled_graph()
+
+        # 构造系统提示（含 Skill 提示词 + 用户长期记忆 + RAG 上下文，按租户隔离）
+        #
+        # 关键：系统提示走 config 传给 agent_node，**不写进 state["messages"]**。
+        # 原来的写法是 ainvoke({"messages": [system_msg, HumanMessage(...)]})，
+        # 而 messages 的 reducer 是 add_messages（追加语义），于是每轮都会往
+        # checkpoint 里多塞一条系统提示——第 N 轮的 prompt 里就有 N 份完整的
+        # 系统提示（每份还都带着记忆/画像/RAG 上下文），token 呈二次方增长。
+        system_prompt = await _build_system_prompt_with_context(message, user_id, kb_ids, tenant_id)
+        config = {
+            "configurable": {
+                "thread_id": scoped_tid,
+                "tools": get_all_tools(),
+                "system_prompt": system_prompt,
+            },
+            "recursion_limit": get_settings().agent_recursion_limit,  # 防止 agent↔tools 死循环
+        }
+
+        try:
+            result = await graph.ainvoke(
+                {"messages": [HumanMessage(content=message)]},
+                config=config,
+            )
+            ai_reply = result["messages"][-1]
+            reply_text = ai_reply.content if hasattr(ai_reply, "content") else str(ai_reply)
+            # 从最后一条 AI 消息提取 usage/provider（agent_node 存在 additional_kwargs）
+            extra = getattr(ai_reply, "additional_kwargs", {}) or {}
+            usage_info = extra.get("usage", {}) or {}
+            provider_info = extra.get("provider")
+        except Exception as e:  # noqa: BLE001
+            error = str(e)
+            reply_text = f"抱歉，处理时出错了：{e}"
+            logger.exception("Agent 执行异常")
+            # 这里吞掉异常是为了给用户一句人话而不是 500，
+            # 但 span 必须标红，否则排查时看到的是一条"成功"的 turn
+            turn.record_exception(e)
+            turn.set_status(StatusCode.ERROR, error)
 
     duration_ms = int((time.time() - start) * 1000)
 
@@ -168,14 +202,26 @@ async def run_agent(message: str, thread_id: str, user_id: str | None = None, kb
 
 
 async def _build_system_prompt_with_context(user_message: str, user_id: str | None, kb_ids: list[str] | None = None, tenant_id: str = "default") -> str:
-    """构造系统提示：基础提示 + Skill 提示词 + 用户长期记忆 + RAG 上下文（按租户隔离）。"""
+    """构造系统提示：基础提示 + Skill 提示词 + 用户长期记忆 + RAG 上下文（按租户隔离）。
+
+    这一段是「回答开始前」的全部准备工作，单独成 span——
+    它由若干次网络往返（向量化 + 检索 + 图查询）组成，
+    出问题时首字延迟会被它拖高，但从外面完全看不出来是卡在这里。
+    """
+    with span("context.build"):
+        return await _build_system_prompt_inner(user_message, user_id, kb_ids, tenant_id)
+
+
+async def _build_system_prompt_inner(user_message: str, user_id: str | None, kb_ids: list[str] | None, tenant_id: str) -> str:
     base = _build_system_prompt()
 
     # RAG 知识库检索增强
     if kb_ids:
         try:
             from app.rag.service import get_rag_service
-            rag_context = await get_rag_service().build_context(kb_ids, user_message, tenant_id=tenant_id)
+            with span("rag.retrieve", **{ATTR_KB_IDS: list(kb_ids)}) as sp:
+                rag_context = await get_rag_service().build_context(kb_ids, user_message, tenant_id=tenant_id)
+                sp.set_attribute(ATTR_CHUNK_COUNT, rag_context.count("<document"))
             if rag_context:
                 # 明确标注这是**不可信的检索内容**：它来自用户上传的文档，
                 # 里面可能藏着「忽略以上指令」之类的注入，模型必须当资料而非指令看待。
@@ -192,8 +238,10 @@ async def _build_system_prompt_with_context(user_message: str, user_id: str | No
     if user_id:
         try:
             from app.memory.store import get_memory_service
-            mem_service = await get_memory_service()
-            memories = await mem_service.search_memory(user_id, user_message, limit=3, tenant_id=tenant_id)
+            with span("memory.search") as sp:
+                mem_service = await get_memory_service()
+                memories = await mem_service.search_memory(user_id, user_message, limit=3, tenant_id=tenant_id)
+                sp.set_attribute(ATTR_MEMORY_HITS, len(memories))
             if memories:
                 mem_text = "\n".join(f"- {m['content']}" for m in memories if m.get("content"))
                 if mem_text:
@@ -202,7 +250,8 @@ async def _build_system_prompt_with_context(user_message: str, user_id: str | No
             # 注入用户画像（兴趣/偏好，按租户隔离）
             from app.auth.tenant import scoped_user_id
             from app.profile.service import get_profile_service
-            profile = await get_profile_service().get_profile(scoped_user_id(tenant_id, user_id))
+            with span("profile.get"):
+                profile = await get_profile_service().get_profile(scoped_user_id(tenant_id, user_id))
             profile_parts: list[str] = []
             if profile.get("interests"):
                 profile_parts.append("兴趣：" + "、".join(profile["interests"]))
@@ -231,17 +280,24 @@ _compiled_graph: Any = None
 
 
 async def get_compiled_graph() -> Any:
-    """获取（必要时异步编译的）图单例。"""
+    """获取（必要时异步编译的）图单例。
+
+    首次调用会连 Postgres 建连接池——DB 不可用时要等满超时，
+    这段时间会算在第一个请求头上。所以：
+    1. 单独成 span，让「第一次请求为什么慢 5 秒」在 trace 里能直接看到；
+    2. 应用启动时预热（见 app/main.py 的 lifespan），让真实用户不吃这个成本。
+    """
     global _compiled_graph
     if _compiled_graph is None:
-        checkpointer = await get_checkpointer()
-        builder = StateGraph(AgentState)
-        builder.add_node("agent", agent_node)
-        builder.add_node("tools", tools_node)
-        builder.add_edge(START, "agent")
-        builder.add_conditional_edges("agent", should_use_tools, {"tools": "tools", "end": END})
-        builder.add_edge("tools", "agent")
-        _compiled_graph = builder.compile(checkpointer=checkpointer)
+        with span("graph.compile"):
+            checkpointer = await get_checkpointer()
+            builder = StateGraph(AgentState)
+            builder.add_node("agent", agent_node)
+            builder.add_node("tools", tools_node)
+            builder.add_edge(START, "agent")
+            builder.add_conditional_edges("agent", should_use_tools, {"tools": "tools", "end": END})
+            builder.add_edge("tools", "agent")
+            _compiled_graph = builder.compile(checkpointer=checkpointer)
     return _compiled_graph
 
 
@@ -268,89 +324,103 @@ async def stream_agent(message: str, thread_id: str, user_id: str | None = None,
     # 多租户：thread_id 加租户前缀防跨租户冲突
     scoped_tid = scoped_thread_id(tenant_id, thread_id)
     start = time.time()
-    graph = await get_compiled_graph()
-    # 同 run_agent：系统提示走 config，不进持久化 messages
-    system_prompt = await _build_system_prompt_with_context(message, user_id, kb_ids, tenant_id)
-    config = {
-        "configurable": {
-            "thread_id": scoped_tid,
-            "tools": get_all_tools(),
-            "system_prompt": system_prompt,
-        },
-        "recursion_limit": get_settings().agent_recursion_limit,
-    }
 
     full_reply_parts: list[str] = []
     error: str | None = None
     stream_usage: dict = {}
     stream_provider: str | None = None
 
-    # 注册流式任务（支持取消）—— 用原始 thread_id 作 cancel key（客户端用原始 id 取消）
-    from app.agent.cancel_registry import register_stream, unregister_stream
-    cancel_event = await register_stream(thread_id)
+    # agent.turn span 跨越整个异步生成器的生命周期。
+    #
+    # 注意：Python 的异步生成器没有独立 context（PEP 568 未落地），
+    # 生成器体在**调用方的 context** 里恢复执行。所以 span 在两次 yield
+    # 之间会「泄漏」到调用方——对我们是无害的（调用方只做 JSON 序列化，
+    # 归到本 turn 名下反而合理），但前提是生成器始终被同一个任务迭代。
+    # SSE / NDJSON 两个端点都满足这一点。
+    # tests/test_telemetry.py 里有断言锁住这棵 span 树的形状。
+    with span("agent.turn", **_turn_attrs(thread_id, tenant_id, user_id, kb_ids, streaming=True)) as turn:
+        graph = await get_compiled_graph()
+        # 同 run_agent：系统提示走 config，不进持久化 messages
+        system_prompt = await _build_system_prompt_with_context(message, user_id, kb_ids, tenant_id)
+        config = {
+            "configurable": {
+                "thread_id": scoped_tid,
+                "tools": get_all_tools(),
+                "system_prompt": system_prompt,
+            },
+            "recursion_limit": get_settings().agent_recursion_limit,
+        }
 
-    try:
-        # 多模式流：custom（writer 推送的 token/工具事件）+ updates（节点状态变化）
-        # version="v2"：统一 StreamPart dict 格式 {"type","ns","data"}（而非 v1 的元组）
-        async for chunk in graph.astream(
-            {"messages": [HumanMessage(content=message)]},
-            config=config,
-            stream_mode=["custom", "updates"],
-            version="v2",
-        ):
-            # 检查取消请求
-            if cancel_event.is_set():
-                logger.info("流式生成被取消 thread=%s", thread_id)
-                yield {"type": "cancelled", "thread_id": thread_id}
-                break
-            # version="v2" 下每个 chunk 是 {"type","ns","data"} 的 StreamPart
-            chunk_type = chunk.get("type")
-            data = chunk.get("data")
+        # 注册流式任务（支持取消）—— 用原始 thread_id 作 cancel key（客户端用原始 id 取消）
+        from app.agent.cancel_registry import register_stream, unregister_stream
+        cancel_event = await register_stream(thread_id)
 
-            if chunk_type == "custom":
-                # writer 推送的事件（token / tool_calls / tool_start / tool_result）
-                if isinstance(data, dict):
-                    etype = data.get("type")
-                    if etype == "token":
-                        full_reply_parts.append(data.get("text", ""))
-                    yield data  # 透传给消费端
+        try:
+            # 多模式流：custom（writer 推送的 token/工具事件）+ updates（节点状态变化）
+            # version="v2"：统一 StreamPart dict 格式 {"type","ns","data"}（而非 v1 的元组）
+            async for chunk in graph.astream(
+                {"messages": [HumanMessage(content=message)]},
+                config=config,
+                stream_mode=["custom", "updates"],
+                version="v2",
+            ):
+                # 检查取消请求
+                if cancel_event.is_set():
+                    logger.info("流式生成被取消 thread=%s", thread_id)
+                    turn.set_attribute("selfagent.cancelled", True)
+                    yield {"type": "cancelled", "thread_id": thread_id}
+                    break
+                # version="v2" 下每个 chunk 是 {"type","ns","data"} 的 StreamPart
+                chunk_type = chunk.get("type")
+                data = chunk.get("data")
 
-            elif chunk_type == "updates" and isinstance(data, dict):
-                # 节点完成后的状态更新：data 是 {node_name: state_delta}
-                for node_name, delta in data.items():
-                    # 从 agent 节点的状态增量里提取最终 AIMessage 文本（兜底）
-                    if node_name != "agent" or not isinstance(delta, dict):
-                        continue
-                    msgs = delta.get("messages", [])
-                    if not msgs:
-                        continue
-                    last = msgs[-1]
-                    content = getattr(last, "content", "")
-                    if content and not full_reply_parts:
-                        full_reply_parts.append(content)
-                    # 抓取 usage/provider 供日志统计
-                    extra = getattr(last, "additional_kwargs", {}) or {}
-                    if extra.get("usage"):
-                        stream_usage = extra["usage"]
-                    if extra.get("provider"):
-                        stream_provider = extra["provider"]
-    except Exception as e:  # noqa: BLE001
-        logger.exception("流式 Agent 执行异常")
-        error = str(e)
-        yield {"type": "error", "message": error}
-    finally:
-        # 注销流式任务（清理取消注册表）
-        await unregister_stream(thread_id)
+                if chunk_type == "custom":
+                    # writer 推送的事件（token / tool_calls / tool_start / tool_result）
+                    if isinstance(data, dict):
+                        etype = data.get("type")
+                        if etype == "token":
+                            full_reply_parts.append(data.get("text", ""))
+                        yield data  # 透传给消费端
 
-    # 若被取消，不再发 done（已发 cancelled）
-    if cancel_event.is_set():
-        return
+                elif chunk_type == "updates" and isinstance(data, dict):
+                    # 节点完成后的状态更新：data 是 {node_name: state_delta}
+                    for node_name, delta in data.items():
+                        # 从 agent 节点的状态增量里提取最终 AIMessage 文本（兜底）
+                        if node_name != "agent" or not isinstance(delta, dict):
+                            continue
+                        msgs = delta.get("messages", [])
+                        if not msgs:
+                            continue
+                        last = msgs[-1]
+                        content = getattr(last, "content", "")
+                        if content and not full_reply_parts:
+                            full_reply_parts.append(content)
+                        # 抓取 usage/provider 供日志统计
+                        extra = getattr(last, "additional_kwargs", {}) or {}
+                        if extra.get("usage"):
+                            stream_usage = extra["usage"]
+                        if extra.get("provider"):
+                            stream_provider = extra["provider"]
+        except Exception as e:  # noqa: BLE001
+            logger.exception("流式 Agent 执行异常")
+            error = str(e)
+            # 同 run_agent：异常转成事件发给前端，但 span 必须标红
+            turn.record_exception(e)
+            turn.set_status(StatusCode.ERROR, error)
+            yield {"type": "error", "message": error}
+        finally:
+            # 注销流式任务（清理取消注册表）
+            await unregister_stream(thread_id)
 
-    reply = "".join(full_reply_parts)
-    duration_ms = int((time.time() - start) * 1000)
+        # 若被取消，不再发 done（已发 cancelled）
+        if cancel_event.is_set():
+            return
 
-    # done 事件（附完整回复，便于客户端拼接校验）
-    yield {"type": "done", "thread_id": thread_id, "reply": reply, "error": error}
+        reply = "".join(full_reply_parts)
+        duration_ms = int((time.time() - start) * 1000)
+
+        # done 事件（附完整回复，便于客户端拼接校验）
+        yield {"type": "done", "thread_id": thread_id, "reply": reply, "error": error}
 
     # 记录对话日志（fire-and-forget，带 tenant_id + usage）
     _spawn(_log_conversation(

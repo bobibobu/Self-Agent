@@ -28,10 +28,23 @@ class Settings(BaseSettings):
 
     # ---------- 应用 ----------
     app_name: str = "Self-Agent"
+    app_version: str = "0.1.0"
     app_env: Literal["dev", "staging", "prod"] = "dev"
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     log_level: str = "INFO"
+
+    # ---------- 链路追踪（OpenTelemetry）----------
+    # 字段名刻意与 OTel 官方环境变量对齐（OTEL_SERVICE_NAME /
+    # OTEL_EXPORTER_OTLP_ENDPOINT），这样标准 OTel 环境变量能直接生效。
+    otel_enabled: bool = False
+    otel_service_name: str = "self-agent"
+    # OTLP HTTP 端点（如 http://localhost:4318）。留空则 span 打到控制台。
+    otel_exporter_otlp_endpoint: str = ""
+    otel_console_export: bool = False
+    # 是否把 prompt/completion 正文记进 span。
+    # ⚠️ 默认关闭：正文可能含用户隐私、密钥、内部文档内容。
+    otel_capture_content: bool = False
 
     # ---------- LLM ----------
     llm_default_provider: Literal["glm", "openai", "anthropic"] = "glm"

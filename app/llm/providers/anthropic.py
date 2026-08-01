@@ -57,6 +57,10 @@ class AnthropicClient:
     def provider_name(self) -> str:
         return "anthropic"
 
+    @property
+    def default_model(self) -> str:
+        return self._default_model
+
     # ---------- 消息格式转换 ----------
     def _split_system(self, messages: list[ChatMessage]) -> tuple[str, list[ChatMessage]]:
         """Anthropic 的 system 是顶层参数，需从消息列表里抽出来。"""
