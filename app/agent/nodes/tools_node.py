@@ -15,16 +15,34 @@ import uuid
 
 from langchain_core.messages import ToolMessage
 from langchain_core.runnables import RunnableConfig
-from langgraph.types import StreamWriter
+from langgraph.types import StreamWriter, interrupt
 from opentelemetry.trace import StatusCode
 
-from app.agent.registry import get_tool
+from app.agent.registry import ToolRisk, get_risk, get_tool
 from app.agent.state import AgentState
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.core.telemetry import ATTR_TOOL_RESULT_CHARS, ATTR_TOOL_TRUNCATED, record_content, tool_span
 
 logger = get_logger(__name__)
+
+
+def _parse_decision(decision: object) -> tuple[bool, str]:
+    """解析客户端回传的审批结果，兼容几种写法。
+
+    接受：True / "approve" / "yes" / {"approved": bool, "reason": str}
+    **无法识别时一律按拒绝处理**——审批环节的默认值必须是"不执行"，
+    否则一个格式不对的回包就会变成静默放行。
+    """
+    if isinstance(decision, bool):
+        return decision, "" if decision else "用户拒绝"
+    if isinstance(decision, str):
+        ok = decision.strip().lower() in {"approve", "approved", "yes", "y", "true", "同意"}
+        return ok, "" if ok else f"用户拒绝（{decision}）"
+    if isinstance(decision, dict):
+        ok = bool(decision.get("approved"))
+        return ok, str(decision.get("reason") or ("" if ok else "用户拒绝"))
+    return False, f"无法识别的审批结果（{type(decision).__name__}），按拒绝处理"
 
 
 def _truncate(text: str, limit: int) -> str:
@@ -39,11 +57,77 @@ def _truncate(text: str, limit: int) -> str:
     return f"{text[:limit]}\n\n...[输出过长，已截断 {omitted} 字符]"
 
 
+def needs_approval(name: str) -> bool:
+    """按策略判断这个工具执行前要不要问用户。
+
+    策略（TOOL_APPROVAL_MODE）：
+        auto     全部放行——仅限沙箱/CI
+        gated    WRITE 与 EXEC 要问（默认）
+        strict   全部都问
+        readonly 只读放行，其余直接拒绝（不问，见 _denied_by_policy）
+    """
+    s = get_settings()
+    mode = s.tool_approval_mode
+    if mode == "auto":
+        return False
+    if name in {n.strip() for n in (s.tool_auto_approve or "").split(",") if n.strip()}:
+        return False
+    if mode == "strict":
+        return True
+    return get_risk(name) is not ToolRisk.READ
+
+
+def _denied_by_policy(name: str) -> str | None:
+    """readonly 模式下直接拒绝写与执行，不打扰用户。"""
+    if get_settings().tool_approval_mode == "readonly" and get_risk(name) is not ToolRisk.READ:
+        return (f"当前为只读模式（TOOL_APPROVAL_MODE=readonly），"
+                f"拒绝执行 {get_risk(name).value} 级工具 {name}")
+    return None
+
+
 async def _run_one(call: dict, writer: StreamWriter, limit: int) -> ToolMessage:
     """执行单个 tool_call，任何异常都转成 ToolMessage 交回模型。"""
     name = call["name"]
     args = call.get("args", {})
     call_id = call.get("id") or f"call_{uuid.uuid4().hex[:8]}"
+
+    # 策略硬拒绝：不弹审批，直接把理由交回模型
+    denial = _denied_by_policy(name)
+    if denial:
+        logger.warning("工具 %s 被策略拒绝", name)
+        writer({"type": "tool_denied", "name": name, "reason": denial})
+        return ToolMessage(content=f"错误：{denial}", tool_call_id=call_id, name=name)
+
+    # 人在回路：写文件、跑命令这类不可逆操作，执行前必须让用户确认。
+    # interrupt() 会挂起整张图并把 payload 抛给客户端，用户决策后
+    # 以 Command(resume=...) 续跑，本函数从 interrupt() 处原地返回。
+    if needs_approval(name):
+        try:
+            decision = interrupt({
+                "type": "tool_approval",
+                "tool": name,
+                "risk": get_risk(name).value,
+                "args": args,
+                "call_id": call_id,
+            })
+        except RuntimeError as e:
+            # interrupt() 需要图上下文与 checkpointer。拿不到就说明没法征求用户意见——
+            # 此时必须**拒绝**而不是放行：审批环节失效时默认执行，
+            # 等于安全机制一坏就自动全开。
+            logger.error("无法发起审批（%s），按拒绝处理：%s", e, name)
+            writer({"type": "tool_denied", "name": name, "reason": "审批通道不可用"})
+            return ToolMessage(
+                content=f"错误：{name} 需要用户审批，但当前环境无法发起审批（{e}）。已拒绝执行。",
+                tool_call_id=call_id, name=name,
+            )
+        approved, reason = _parse_decision(decision)
+        if not approved:
+            logger.info("用户拒绝了工具调用 %s：%s", name, reason)
+            writer({"type": "tool_denied", "name": name, "reason": reason})
+            # 把拒绝原因交回模型，它可以换个做法而不是硬撞
+            return ToolMessage(
+                content=f"用户拒绝了此操作。原因：{reason}", tool_call_id=call_id, name=name,
+            )
 
     writer({"type": "tool_start", "name": name, "args": args})
 

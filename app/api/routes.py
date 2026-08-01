@@ -51,15 +51,22 @@ async def health() -> HealthResponse:
 @router.get("/tools", tags=["能力"])
 async def list_tools():
     """列出 Agent 当前可用的全部工具（内置 + MCP + Skill）。"""
-    from app.agent.registry import get_all_tools
+    from app.agent.registry import get_all_tools, get_risk
+    from app.core.config import get_settings
 
     tools = []
     for t in get_all_tools():
         tools.append({
             "name": t.name,
             "description": (t.description or "")[:200],
+            # 风险等级决定执行前要不要弹审批，客户端据此渲染提示
+            "risk": get_risk(t.name).value,
         })
-    return {"count": len(tools), "tools": tools}
+    return {
+        "count": len(tools),
+        "approval_mode": get_settings().tool_approval_mode,
+        "tools": tools,
+    }
 
 
 @router.get("/skills", tags=["能力"])

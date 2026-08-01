@@ -135,3 +135,13 @@ ALL_TOOLS = [calculator, get_current_time, get_weather]
 
 # 工具名 → 工具函数 的映射，供 tools 执行节点查找
 TOOL_MAP = {t.name: t for t in ALL_TOOLS}
+
+# 内置工具的风险等级。三者都是纯计算/查询，不碰文件也不执行命令，
+# 归为只读，不该为它们弹审批。
+# 显式写在这里而不是靠 @tool 的参数：不同 langchain-core 版本的
+# 装饰器签名不一致（有的叫 metadata，有的叫 extras）。
+TOOL_RISKS = {
+    "calculator": "read",
+    "get_current_time": "read",
+    "get_weather": "read",
+}

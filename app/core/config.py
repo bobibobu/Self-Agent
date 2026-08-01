@@ -110,6 +110,27 @@ class Settings(BaseSettings):
     mcp_server_enabled: bool = False
     mcp_server_port: int = 9000
 
+    # ---------- 工作区（编码 Agent 的上下文单位）----------
+    # 留空则用进程当前目录。所有文件/Shell 工具都被禁闭在这个目录内。
+    workspace_root: str = ""
+
+    # 是否注册编码类工具（文件读写 + Shell）。做纯问答机器人时可关掉。
+    coding_tools_enabled: bool = True
+
+    # ---------- 工具安全 ----------
+    # 工具审批策略：
+    #   auto   —— 全部直接执行（仅限沙箱/CI，别在自己机器上用）
+    #   gated  —— 写文件与执行命令前询问用户（默认）
+    #   strict —— 所有工具调用都询问
+    #   readonly —— 只允许只读工具，写与执行一律拒绝
+    tool_approval_mode: Literal["auto", "gated", "strict", "readonly"] = "gated"
+    # 免审批的工具名单（逗号分隔），gated 模式下对这些工具放行
+    tool_auto_approve: str = ""
+    # Shell 命令超时（秒）与输出上限
+    shell_timeout_seconds: float = 120.0
+    # 单个文件读取上限（字节），防止一个大文件撑爆上下文
+    file_read_max_bytes: int = 256_000
+
     # ---------- Agent ----------
     # agent↔tools 循环的最大步数（每个工具回合消耗 2 步）
     agent_recursion_limit: int = 25

@@ -38,6 +38,13 @@ _BLACKHOLE = {
     # 别去连真实 LLM
     "GLM_API_KEY": "", "OPENAI_API_KEY": "", "ANTHROPIC_API_KEY": "",
     "EMBEDDING_PROVIDER": "none",
+    # 工具审批默认放行：绝大多数用例测的是执行机制而不是审批策略，
+    # 每个用例都去理会审批只会制造噪音。审批策略本身由
+    # tests/test_coding_tools.py::TestApprovalPolicy 显式设置各模式来覆盖。
+    "TOOL_APPROVAL_MODE": "auto",
+    # 编码工具默认不注册进全局注册表：需要它们的用例自己注册，
+    # 避免污染其他用例看到的工具列表
+    "CODING_TOOLS_ENABLED": "false",
     # 上传目录挪到临时区，别往仓库里写
     "UPLOAD_DIR": os.path.join(os.path.sep, "tmp", "selfagent-test-uploads"),
 }

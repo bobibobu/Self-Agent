@@ -49,6 +49,21 @@ async def lifespan(app: FastAPI):
         if settings.jwt_secret == "self-agent-dev-secret-change-in-production":
             logger.error("⚠️ 生产环境必须修改默认 JWT_SECRET！")
             raise RuntimeError("生产环境必须设置自定义 JWT_SECRET")
+    # 注册编码类工具（文件 + Shell）。风险等级由各工具的 metadata 声明，
+    # 写与执行默认要经用户审批（TOOL_APPROVAL_MODE=gated）。
+    if settings.coding_tools_enabled:
+        from app.agent.registry import ToolRisk, register_tools
+        from app.agent.tools.files import READ_TOOLS, WRITE_TOOLS
+        from app.agent.tools.shell import SHELL_TOOLS
+        from app.workspace import get_workspace
+
+        ws = get_workspace()
+        n = (register_tools(READ_TOOLS, ToolRisk.READ)
+             + register_tools(WRITE_TOOLS, ToolRisk.WRITE)
+             + register_tools(SHELL_TOOLS, ToolRisk.EXEC))
+        logger.info("✅ 编码工具已注册（%d 个），工作区：%s，审批策略：%s",
+                    n, ws.root, settings.tool_approval_mode)
+
     await db_manager.connect()
     # 连接外部 MCP server 并发现工具（失败不阻断）
     await mcp_client_manager.connect()
