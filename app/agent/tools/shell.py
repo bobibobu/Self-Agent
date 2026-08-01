@@ -13,8 +13,12 @@ Shell 执行工具
 4. **输出截断**，避免一次 `find /` 把上下文撑爆。
 5. 风险等级 EXEC，默认策略下执行前必须经用户审批（见 tools_node）。
 
-注意：这**不是沙箱**。审批通过后命令就是以当前进程的权限真实执行的。
-真正的隔离需要容器/seccomp，属于后续工作，README 的已知限制里有记录。
+6. **沙箱隔离**（app/sandbox.py）：可写范围收敛到工作区，隐藏 $HOME
+   （连同 ~/.ssh ~/.aws 里的凭据），默认切断网络。
+
+审批与沙箱是两层，不能互相替代：审批管「模型想干什么，用户知不知情」，
+沙箱管「用户点了同意之后最多能造成多大破坏」——审批通过的 pytest
+也可能因为项目里有个恶意 conftest.py 而读走 SSH key。
 """
 
 from __future__ import annotations
@@ -29,6 +33,7 @@ from langchain_core.tools import tool
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.sandbox import wrap_command
 from app.workspace import WorkspaceError, get_workspace
 
 logger = get_logger(__name__)
@@ -95,16 +100,27 @@ async def run_command(command: str, cwd: str = ".") -> str:
         logger.warning("run_command 拒绝执行：%s（%s）", command, denied)
         return f"错误：拒绝执行此命令——{denied}"
 
-    logger.info("run_command: %s（cwd=%s）", command, ws.relative(workdir))
+    # 套沙箱：把可写范围收敛到工作区，隐藏 $HOME（~/.ssh、~/.aws 等凭据），
+    # 默认切断网络。审批解决"用户知不知情"，沙箱解决"同意之后能造成多大破坏"。
+    sbx = wrap_command(
+        argv, workspace=ws.root, cwd=workdir, allow_network=s.sandbox_allow_network,
+    )
+    backend = sbx.backend
+    # env 覆盖（主要是把 TMPDIR 指向沙箱私有临时目录）
+    child_env = {**os.environ, **sbx.env} if sbx.env else None
+
+    logger.info("run_command: %s（cwd=%s, sandbox=%s）", command, ws.relative(workdir), backend.value)
     try:
         proc = await asyncio.create_subprocess_exec(
-            *argv,
+            *sbx.argv,
             cwd=str(workdir),
+            env=child_env,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             # 独立进程组：超时时能连子进程一起杀掉，
             # 只 kill 父进程会留下还在跑的孤儿（比如 npm 拉起的 node）
             start_new_session=True,
+            preexec_fn=sbx.preexec,  # noqa: PLW1509 —— Landlock 必须在 fork 后 exec 前施加
         )
     except FileNotFoundError:
         return f"错误：找不到命令 {argv[0]!r}"
@@ -123,7 +139,10 @@ async def run_command(command: str, cwd: str = ".") -> str:
         output = output[:_MAX_OUTPUT_CHARS] + f"\n...[输出过长，已截断 {omitted} 字符]"
 
     status = "成功" if proc.returncode == 0 else f"失败（退出码 {proc.returncode}）"
-    return f"$ {command}\n[{status}]\n{output or '(无输出)'}"
+    # 把生效的沙箱后端写进输出：用户和模型都该知道这条命令跑在哪一层保护下，
+    # 「以为有沙箱其实没有」比「明确知道没有」危险得多
+    tag = f" sandbox={backend.value}" if backend.value != "none" else " sandbox=none ⚠️"
+    return f"$ {command}\n[{status}{tag}]\n{output or '(无输出)'}"
 
 
 def _kill_process_group(proc) -> None:

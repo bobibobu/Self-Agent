@@ -25,7 +25,7 @@
 | 数据库 | PostgreSQL · MongoDB · Redis · Neo4j |
 | 协议 | MCP · A2A |
 | 可观测 | OpenTelemetry（GenAI 语义约定）· Jaeger |
-| 编码能力 | 工作区禁闭 · 文件读写 · Shell 执行 · 工具审批闸门 |
+| 编码能力 | 工作区禁闭 · 文件读写 · Shell 执行 · 审批闸门 · 沙箱隔离 |
 | 包管理 | uv |
 
 ## 🚀 5 分钟快速开始
@@ -215,7 +215,7 @@ cd infra && docker compose up -d --force-recreate postgres
 | 上传文件 | 扁平目录、无按用户分区；`/uploads` 静态目录本身不鉴权，知道文件名即可下载 |
 | JWT | 无吊销名单，改密码/登出无法使已签发 token 失效（token 里已留 `jti` 锚点） |
 | Hermes 进化 | 采纳与否只依据 LLM 自评分，没有评测集把关；反思样本取自全部对话，存在提示词注入面（已限管理员触发） |
-| 沙箱 | 审批通过后命令以当前进程权限**真实执行**，没有容器/seccomp 隔离。审批闸门防的是"模型误操作"，不是"恶意模型" |
+| 沙箱 | 已实现（bubblewrap / Landlock 分层降级）。但 Landlock 后端**只管文件系统不限制网络**；两者都不做 syscall 过滤，未防提权类攻击 |
 | CLI 架构 | CLI 仍是 HTTP 瘦客户端，文件工具操作的是**服务端**磁盘。要做 Claude Code 那样的本地 CLI，需要 CLI 内嵌 Agent（下一步） |
 | 多模态 | 图片能上传，但 LLM 层 `ChatMessage.content` 只支持纯文本，图片进不了对话 |
 | 部署 | 无应用自身的 Dockerfile，无 CI |

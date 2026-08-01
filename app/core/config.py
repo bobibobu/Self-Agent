@@ -126,6 +126,17 @@ class Settings(BaseSettings):
     tool_approval_mode: Literal["auto", "gated", "strict", "readonly"] = "gated"
     # 免审批的工具名单（逗号分隔），gated 模式下对这些工具放行
     tool_auto_approve: str = ""
+    # ---------- 命令沙箱 ----------
+    # 审批闸门管「用户知不知情」，沙箱管「同意之后最多能造成多大破坏」。
+    # 两者不能互相替代：审批通过的 pytest 也可能因为项目里有恶意 conftest.py
+    # 而读走 ~/.ssh/id_rsa。
+    sandbox_enabled: bool = True
+    # auto：优先 bwrap，退到 landlock，都没有则无隔离（并告警）
+    sandbox_backend: Literal["auto", "bwrap", "landlock", "none"] = "auto"
+    # 沙箱内是否允许联网。默认切断——防的是把代码/密钥 POST 出去。
+    # 需要 pip install / npm install 时再打开。
+    sandbox_allow_network: bool = False
+
     # Shell 命令超时（秒）与输出上限
     shell_timeout_seconds: float = 120.0
     # 单个文件读取上限（字节），防止一个大文件撑爆上下文
