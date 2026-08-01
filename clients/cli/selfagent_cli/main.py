@@ -17,6 +17,7 @@ Self-Agent CLI 主程序
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import sys
 
 import httpx
@@ -26,7 +27,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
 
-from selfagent_cli.api import get_json, stream_chat
+from selfagent_cli.api import AuthRequired, get_json, login, register, stream_chat
 from selfagent_cli.config import Session
 
 console = Console()
@@ -47,7 +48,6 @@ async def run_stream(session: Session, message: str) -> None:
 
     def render():
         """构造当前渲染内容。"""
-        from io import StringIO
 
         parts = []
         if tool_lines:
@@ -57,7 +57,9 @@ async def run_stream(session: Session, message: str) -> None:
 
     try:
         with Live(render(), console=console, refresh_per_second=20, vertical_overflow="visible") as live:
-            async for event in stream_chat(session.api_url, message, session.thread_id, session.user_id):
+            async for event in stream_chat(
+                session.api_url, message, session.thread_id, session.user_id, token=session.token,
+            ):
                 etype = event.get("type")
                 if etype == "token":
                     full_text.append(event.get("text", ""))
@@ -80,6 +82,11 @@ async def run_stream(session: Session, message: str) -> None:
                 elif etype == "error":
                     tool_lines.append(f"⚠️ 错误: {event.get('message')}")
                     live.update(render())
+    except AuthRequired as e:
+        console.print(f"\n[yellow]🔒 {e}[/]")
+        console.print("[dim]后端开了认证（AUTH_ENABLED=true）。执行 /login <用户名> 登录，"
+                      "或 /register <用户名> 注册。[/]")
+        return
     except httpx.ConnectError as e:
         console.print(f"\n[red]⚠️ 连接失败：{e}[/]")
         console.print(f"[dim]请确认后端已启动：{session.api_url}[/]")
@@ -104,63 +111,170 @@ async def handle_command(session: Session, cmd: str, args: list[str]) -> bool:
         return False
     if cmd == "help":
         console.print(Panel(
-            "[bold]命令：[/]\n"
-            "  /new          新对话（重置会话）\n"
-            "  /user <id>    设置用户 ID\n"
-            "  /tools        列出可用工具\n"
-            "  /memory <id>  查看用户记忆（需 query 参数）\n"
-            "  /profile <id> 查看用户画像\n"
-            "  /status       查看当前会话状态\n"
-            "  /help         显示帮助\n"
-            "  /exit         退出",
+            "[bold]账号：[/]\n"
+            "  /login <用户名>     登录（后端开认证时必需）\n"
+            "  /register <用户名>  注册新账号并登录\n"
+            "  /logout            退出登录，清除本地 token\n"
+            "[bold]会话：[/]\n"
+            "  /new               新对话（重置会话）\n"
+            "  /sessions          列出历史会话\n"
+            "  /resume <thread>   切到指定会话并显示历史\n"
+            "  /history           显示当前会话的历史消息\n"
+            "[bold]其他：[/]\n"
+            "  /tools             列出可用工具\n"
+            "  /memory <关键词>   检索长期记忆\n"
+            "  /profile [用户id]  查看用户画像\n"
+            "  /status            查看当前状态\n"
+            "  /help /exit",
             title="帮助", border_style="cyan",
         ))
+    elif cmd == "login":
+        await _do_login(session, args, is_register=False)
+    elif cmd == "register":
+        await _do_login(session, args, is_register=True)
+    elif cmd == "logout":
+        session.logout()
+        console.print("[green]✓ 已退出登录，本地 token 已清除[/]")
     elif cmd == "new":
         session.reset_thread()
         console.print(f"[green]✓ 新会话：{session.thread_id}[/]")
+    elif cmd == "sessions":
+        await _guarded(_list_sessions(session))
+    elif cmd == "resume":
+        if not args:
+            console.print("[yellow]用法：/resume <thread_id>（先用 /sessions 查看）[/]")
+        else:
+            session.thread_id = args[0]
+            console.print(f"[green]✓ 已切到会话 {session.thread_id}[/]")
+            await _guarded(_show_history(session))
+    elif cmd == "history":
+        await _guarded(_show_history(session))
     elif cmd == "user":
         if args:
             session.user_id = args[0]
             console.print(f"[green]✓ 用户已设为：{session.user_id}[/]")
+            if session.is_logged_in:
+                console.print("[dim]注意：已登录时后端以 token 身份为准，此设置只影响本地展示[/]")
         else:
             console.print(f"当前用户：{session.user_id}")
     elif cmd == "status":
-        console.print(f"[dim]API: {session.api_url}[/]")
-        console.print(f"[dim]用户: {session.user_id}[/]")
+        who = f"{session.username} ({session.user_id})" if session.is_logged_in else "未登录（匿名模式）"
+        console.print(f"[dim]API:  {session.api_url}[/]")
+        console.print(f"[dim]身份: {who}[/]")
         console.print(f"[dim]会话: {session.thread_id}[/]")
     elif cmd == "tools":
-        try:
-            data = await get_json(session.api_url, "/tools")
-            for t in data.get("tools", []):
-                console.print(f"  🔧 [bold]{t['name']}[/] [dim]- {t.get('description', '')[:50]}[/]")
-        except Exception as e:  # noqa: BLE001
-            console.print(f"[red]获取失败：{e}[/]")
+        await _guarded(_list_tools(session))
     elif cmd == "profile":
         uid = args[0] if args else session.user_id
-        try:
-            data = await get_json(session.api_url, f"/profile/{uid}")
-            console.print(Panel(
-                f"兴趣: {data.get('interests', [])}\n"
-                f"偏好: {data.get('preferences', {})}\n"
-                f"来源: {data.get('source')}",
-                title=f"用户画像 · {uid}", border_style="magenta",
-            ))
-        except Exception as e:  # noqa: BLE001
-            console.print(f"[red]获取失败：{e}[/]")
+        await _guarded(_show_profile(session, uid))
     elif cmd == "memory":
         if not args:
             console.print("[yellow]用法：/memory <查询关键词>[/]")
         else:
-            query = " ".join(args)
-            try:
-                data = await get_json(session.api_url, f"/memory/{session.user_id}?query={query}")
-                for m in data.get("memories", []):
-                    console.print(f"  • {m.get('content', '')}")
-            except Exception as e:  # noqa: BLE001
-                console.print(f"[red]获取失败：{e}[/]")
+            await _guarded(_search_memory(session, " ".join(args)))
     else:
         console.print(f"[red]未知命令：/{cmd}（/help 查看可用命令）[/]")
     return True
+
+
+async def _guarded(coro) -> None:
+    """统一处理命令里的 401 与其他异常，避免每个分支重复 try。"""
+    try:
+        await coro
+    except AuthRequired as e:
+        console.print(f"[yellow]🔒 {e}[/]")
+    except Exception as e:  # noqa: BLE001
+        console.print(f"[red]获取失败：{e}[/]")
+
+
+async def _do_login(session: Session, args: list[str], *, is_register: bool) -> None:
+    """登录 / 注册。密码走 getpass 读取，不回显、不进 shell 历史。"""
+    import getpass
+
+    action = "注册" if is_register else "登录"
+    username = args[0] if args else console.input("用户名: ").strip()
+    if not username:
+        console.print("[yellow]已取消[/]")
+        return
+    try:
+        password = getpass.getpass("密码: ")
+    except (EOFError, KeyboardInterrupt):
+        console.print("\n[yellow]已取消[/]")
+        return
+    if not password:
+        console.print("[yellow]已取消[/]")
+        return
+
+    try:
+        fn = register if is_register else login
+        data = await fn(session.api_url, username, password)
+    except Exception as e:  # noqa: BLE001
+        console.print(f"[red]{action}失败：{e}[/]")
+        return
+
+    session.set_auth(data["access_token"], data.get("user") or {})
+    console.print(f"[green]✓ {action}成功，欢迎 {session.username or username}[/]")
+    console.print("[dim]token 已保存到 ~/.config/selfagent/credentials.json（权限 0600）[/]")
+
+
+async def _list_sessions(session: Session) -> None:
+    data = await get_json(session.api_url, "/sessions", token=session.token)
+    sessions = data.get("sessions", [])
+    if not sessions:
+        console.print("[dim]暂无历史会话[/]")
+        return
+    for s in sessions:
+        mark = "→" if s["thread_id"] == session.thread_id else " "
+        console.print(f" {mark} [bold]{s['thread_id']}[/]  {s.get('title', '')}  "
+                      f"[dim]{(s.get('updated_at') or '')[:19]}[/]")
+    console.print("[dim]用 /resume <thread_id> 切换[/]")
+
+
+async def _show_history(session: Session) -> None:
+    """显示当前会话的历史消息（来自 MongoDB 对话日志）。"""
+    data = await get_json(
+        session.api_url, f"/history/{session.thread_id}", token=session.token, params={"limit": 50},
+    )
+    events = data.get("events", [])
+    if not events:
+        console.print("[dim]这个会话还没有历史消息"
+                      "（历史来自 MongoDB 对话日志，若未启动 Mongo 则始终为空）[/]")
+        return
+    for ev in events:
+        if ev.get("user_message"):
+            console.print(f"[bold cyan]>>> {ev['user_message']}[/]")
+        if ev.get("agent_reply"):
+            console.print(ev["agent_reply"])
+        console.print()
+
+
+async def _list_tools(session: Session) -> None:
+    data = await get_json(session.api_url, "/tools", token=session.token)
+    for t in data.get("tools", []):
+        console.print(f"  🔧 [bold]{t['name']}[/] [dim]- {t.get('description', '')[:50]}[/]")
+
+
+async def _show_profile(session: Session, uid: str) -> None:
+    data = await get_json(session.api_url, f"/profile/{uid}", token=session.token)
+    console.print(Panel(
+        f"兴趣: {data.get('interests', [])}\n"
+        f"偏好: {data.get('preferences', {})}\n"
+        f"来源: {data.get('source')}",
+        title=f"用户画像 · {uid}", border_style="magenta",
+    ))
+
+
+async def _search_memory(session: Session, query: str) -> None:
+    # 查询串走 params 交给 httpx 编码：手工拼 f"?query={query}" 遇到空格/中文/& 会拼坏
+    data = await get_json(
+        session.api_url, f"/memory/{session.user_id}",
+        token=session.token, params={"query": query},
+    )
+    memories = data.get("memories", [])
+    if not memories:
+        console.print("[dim]没有检索到相关记忆[/]")
+    for m in memories:
+        console.print(f"  • {m.get('content', '')}")
 
 
 def read_input() -> str:
@@ -183,9 +297,24 @@ async def repl(session: Session) -> None:
     # 检查后端连接
     try:
         h = await get_json(session.api_url, "/health")
-        console.print(f"[green]✓ 已连接后端（{h.get('app')} v{h.get('version')}，provider={h.get('default_provider')}）[/]\n")
+        console.print(f"[green]✓ 已连接后端（{h.get('app')} v{h.get('version')}，provider={h.get('default_provider')}）[/]")
     except Exception:  # noqa: BLE001
         console.print(f"[yellow]⚠ 无法连接后端 {session.api_url}，请先启动：uv run uvicorn app.main:app[/]\n")
+        return
+
+    # 探测后端是否要求认证：直接问一个受保护端点，比让用户在第一句话上撞 401 好
+    try:
+        await get_json(session.api_url, "/sessions", token=session.token)
+        if session.is_logged_in:
+            console.print(f"[green]✓ 已登录：{session.username or session.user_id}[/]\n")
+        else:
+            console.print("[dim]后端未开启认证，以匿名模式运行[/]\n")
+    except AuthRequired:
+        console.print("[yellow]🔒 后端已开启认证，请先登录：[/]")
+        console.print("[dim]  /login <用户名>     已有账号[/]")
+        console.print("[dim]  /register <用户名>  新建账号[/]\n")
+    except Exception:  # noqa: BLE001
+        console.print()
 
     while True:
         try:
@@ -226,10 +355,8 @@ async def async_main() -> None:
 
 def main() -> None:
     """入口点（被 console_script 调用）。"""
-    try:
+    with contextlib.suppress(KeyboardInterrupt):
         asyncio.run(async_main())
-    except KeyboardInterrupt:
-        pass
 
 
 if __name__ == "__main__":

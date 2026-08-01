@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import {
-  streamChat, listTools, health,
+  streamChat, listTools, health, getHistory,
   listSessions, createSession, deleteSession, renameSession, cancelChat,
   isLoggedIn, getUser, clearAuth,
 } from './api.js'
@@ -25,6 +25,8 @@ function ChatApp({ onLogout }) {
   const [tools, setTools] = useState([])
   const [connected, setConnected] = useState(false)
   const [sessions, setSessions] = useState([])
+  const [historyState, setHistoryState] = useState('idle')  // idle | loading | ok | empty | error
+  const [historyError, setHistoryError] = useState('')
   const messagesEndRef = useRef(null)
 
   useEffect(() => {
@@ -48,12 +50,25 @@ function ChatApp({ onLogout }) {
     const session = await createSession()
     setThreadId(session.thread_id)
     setMessages([])
+    setHistoryState('idle')
     await refreshSessions()
   }
 
   async function handleSelectSession(tid) {
+    if (tid === threadId || streaming) return
     setThreadId(tid)
     setMessages([])
+    setHistoryState('loading')
+    try {
+      const past = await getHistory(tid)
+      setMessages(past)
+      setHistoryState(past.length ? 'ok' : 'empty')
+    } catch (e) {
+      // 历史来自 MongoDB 的对话日志；Mongo 没起时这里会失败。
+      // 不能静默——否则用户看到的是「这个会话是空的」，与事实不符。
+      setHistoryState('error')
+      setHistoryError(e.message)
+    }
   }
 
   async function handleDeleteSession(tid, e) {
@@ -83,7 +98,6 @@ function ChatApp({ onLogout }) {
 
     const userMsg = input.trim()
     setInput('')
-    const assistantIdx = messages.length + 1
     setMessages((prev) => [
       ...prev,
       { role: 'user', content: userMsg },
@@ -91,44 +105,52 @@ function ChatApp({ onLogout }) {
     ])
     setStreaming(true)
 
+    // 所有更新都作用在「最后一条消息」上，并且是不可变更新。
+    //
+    // 原来的写法是先算好 assistantIdx = messages.length + 1，再 next[idx].content += ...
+    // 两个问题：
+    //   1. assistantIdx 取自闭包里的旧 messages，加载历史后会错位；
+    //   2. `+=` 是原地改对象，而 React.StrictMode 在开发模式会双调用 updater，
+    //      同一个 token 会被追加两次（页面上表现为「你你好好呀呀」）。
+    const updateLast = (fn) => setMessages((prev) => {
+      if (!prev.length) return prev
+      const last = prev[prev.length - 1]
+      if (last.role !== 'assistant') return prev
+      return [...prev.slice(0, -1), fn(last)]
+    })
+
     try {
       await streamChat({ message: userMsg, thread_id: currentThread }, (event) => {
-        setMessages((prev) => {
-          const next = [...prev]
-          const msg = next[assistantIdx]
-          if (!msg) return prev
-          if (event.type === 'token') {
-            msg.content += event.text || ''
-          } else if (event.type === 'tool_start') {
-            msg.toolSteps = [...(msg.toolSteps || []), { name: event.name, args: event.args, status: 'running' }]
-          } else if (event.type === 'tool_result') {
-            msg.toolSteps = (msg.toolSteps || []).map((s, i) =>
-              i === msg.toolSteps.length - 1 ? { ...s, status: 'done', result: event.content } : s
-            )
-          } else if (event.type === 'done') {
-            msg.streaming = false
-            if (event.reply && !msg.content) msg.content = event.reply
-          } else if (event.type === 'cancelled') {
-            msg.streaming = false
-            msg.content += '\n\n_(已中断)_'
-          } else if (event.type === 'error') {
-            msg.content += `\n\n⚠️ ${event.message}`
-            msg.streaming = false
-          }
-          return next
-        })
+        if (event.type === 'token') {
+          updateLast((m) => ({ ...m, content: m.content + (event.text || '') }))
+        } else if (event.type === 'tool_start') {
+          updateLast((m) => ({
+            ...m,
+            toolSteps: [...(m.toolSteps || []), { name: event.name, args: event.args, status: 'running' }],
+          }))
+        } else if (event.type === 'tool_result') {
+          updateLast((m) => {
+            const steps = m.toolSteps || []
+            return {
+              ...m,
+              toolSteps: steps.map((s, i) =>
+                i === steps.length - 1 ? { ...s, status: 'done', result: event.content } : s
+              ),
+            }
+          })
+        } else if (event.type === 'done') {
+          // 兜底：若流式 token 一个都没收到，用 done 里的完整回复补上
+          updateLast((m) => ({ ...m, streaming: false, content: m.content || event.reply || '' }))
+        } else if (event.type === 'cancelled') {
+          updateLast((m) => ({ ...m, streaming: false, content: m.content + '\n\n_(已中断)_' }))
+        } else if (event.type === 'error') {
+          updateLast((m) => ({ ...m, streaming: false, content: m.content + `\n\n⚠️ ${event.message}` }))
+        }
       })
       await refreshSessions()
     } catch (e) {
       if (e.message.includes('登录')) { onLogout(); return }
-      setMessages((prev) => {
-        const next = [...prev]
-        if (next[assistantIdx]) {
-          next[assistantIdx].content = `⚠️ ${e.message}`
-          next[assistantIdx].streaming = false
-        }
-        return next
-      })
+      updateLast((m) => ({ ...m, streaming: false, content: `⚠️ ${e.message}` }))
     } finally {
       setStreaming(false)
     }
@@ -182,10 +204,21 @@ function ChatApp({ onLogout }) {
 
       <main className="chat-area">
         <div className="messages">
-          {messages.length === 0 && (
+          {historyState === 'loading' && (
+            <div className="empty"><div className="empty-icon">⏳</div><p>正在加载历史消息…</p></div>
+          )}
+          {historyState === 'error' && (
+            <div className="empty">
+              <div className="empty-icon">⚠️</div>
+              <p>历史消息加载失败</p>
+              <p className="hint">{historyError}</p>
+              <p className="hint">历史来自 MongoDB 对话日志，请确认它已启动</p>
+            </div>
+          )}
+          {messages.length === 0 && historyState !== 'loading' && historyState !== 'error' && (
             <div className="empty">
               <div className="empty-icon">💬</div>
-              <p>{threadId ? '开始对话' : '点击「新对话」开始'}</p>
+              <p>{historyState === 'empty' ? '这个会话还没有消息' : (threadId ? '开始对话' : '点击「新对话」开始')}</p>
               <p className="hint">流式输出 · 工具调用 · 记忆增强 · 上下文续接</p>
             </div>
           )}

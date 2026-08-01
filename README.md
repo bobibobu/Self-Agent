@@ -122,6 +122,11 @@ cd clients/cli && pip install -e .
 selfagent              # 交互式 REPL
 selfagent "你好"       # 单次查询
 ```
+后端开了认证时先登录（token 存在 `~/.config/selfagent/credentials.json`，权限 0600）：
+```
+/register <用户名>   新建账号    /login <用户名>   已有账号
+/sessions            列出会话    /resume <thread>  切会话并显示历史
+```
 
 ### 3. API 直接调用
 ```bash

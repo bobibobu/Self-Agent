@@ -235,10 +235,26 @@ async def get_profile(user_id: str, user: CurrentUser = Depends(get_current_user
 
 
 @router.get("/history/{thread_id}", tags=["对话"])
-async def get_history(thread_id: str, limit: int = 20, user: CurrentUser = Depends(get_current_user)):
-    """查询某会话的对话历史（从 MongoDB，按租户隔离）。"""
+async def get_history(
+    thread_id: str,
+    limit: int = Query(20, ge=1, le=200),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """查询某会话的对话历史（从 MongoDB，按租户 + 归属人隔离）。
+
+    与 /sessions 同一套归属规则：只按 tenant 过滤的话，同租户里任何人
+    猜到 thread_id 就能读到别人的完整对话内容——比会话改名更严重。
+    """
     from app.auth.tenant import scoped_thread_id
     from app.logging_service import get_conversation_logger
+    from app.services.session_service import get_session_service
+
+    if user.is_authenticated:
+        owned = await get_session_service().get_session(
+            thread_id, tenant_id=user.tenant_id, user_id=user.user_id,
+        )
+        if owned is None:
+            raise NotFoundError("会话不存在")
 
     scoped_tid = scoped_thread_id(user.tenant_id, thread_id)
     events = await get_conversation_logger().get_history(scoped_tid, limit=limit)

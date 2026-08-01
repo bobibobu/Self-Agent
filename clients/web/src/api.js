@@ -106,31 +106,53 @@ export async function streamChat({ message, thread_id, kb_ids }, onEvent) {
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
-    buffer += decoder.decode(value, { stream: true })
+    // 关键：先把 CRLF / CR 归一成 LF 再切分。
+    // SSE 规范允许 CRLF、CR、LF 三种行结束符，服务端（sse-starlette）用的是
+    // CRLF——直接 split('\n\n') 对 '\r\n\r\n' 永远不匹配，
+    // 结果是整个流被当成一块，所有 data 拼在一起 JSON.parse 失败，
+    // 前端只收到一个空的 done 事件，页面上就是个空气泡。
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n|\r/g, '\n')
 
     const blocks = buffer.split('\n\n')
-    buffer = blocks.pop()
+    buffer = blocks.pop()   // 最后一段可能不完整，留到下一轮
 
     for (const block of blocks) {
       const event = parseSSEBlock(block)
       if (event) onEvent(event)
     }
   }
-  if (buffer.trim()) {
-    const event = parseSSEBlock(buffer)
+  // 冲掉解码器与缓冲区里的残留
+  buffer += decoder.decode().replace(/\r\n|\r/g, '\n')
+  for (const block of buffer.split('\n\n')) {
+    const event = parseSSEBlock(block)
     if (event) onEvent(event)
   }
 }
 
+/** 解析一个 SSE 事件块（已归一为 LF）。返回 null 表示该块无数据（如心跳注释）。 */
 function parseSSEBlock(block) {
+  if (!block.trim()) return null
+
   let eventType = 'message'
-  let dataStr = ''
+  const dataLines = []
+
   for (const line of block.split('\n')) {
-    if (line.startsWith('event:')) eventType = line.slice(6).trim()
-    else if (line.startsWith('data:')) dataStr += line.slice(5).trim()
+    if (!line || line.startsWith(':')) continue   // 空行与注释（sse-starlette 的 ping）
+    const colon = line.indexOf(':')
+    const field = colon === -1 ? line : line.slice(0, colon)
+    // 规范：冒号后若有一个空格则去掉，且**只去一个**——
+    // 不能用 trim()，否则 JSON 里的前后空白语义会被改掉
+    let value = colon === -1 ? '' : line.slice(colon + 1)
+    if (value.startsWith(' ')) value = value.slice(1)
+
+    if (field === 'event') eventType = value
+    else if (field === 'data') dataLines.push(value)
   }
-  if (!dataStr) return null
+
+  if (!dataLines.length) return null
+  const dataStr = dataLines.join('\n')   // 规范：多条 data 用换行拼接
   try {
+    // payload 里自带 type 字段，让它覆盖 event: 行（两者本来就一致）
     return { type: eventType, ...JSON.parse(dataStr) }
   } catch {
     return { type: eventType, raw: dataStr }
@@ -186,6 +208,31 @@ export async function deleteSession(threadId) {
     headers: authHeaders(),
   })
   return resp.json()
+}
+
+/**
+ * 取某个会话的历史消息。
+ *
+ * 数据来自 MongoDB 的对话日志（每条记录 = 一轮问答），不是 checkpointer——
+ * checkpointer 存的是给模型看的完整状态（含工具消息、系统提示），
+ * 不适合直接渲染给用户。
+ * 返回按时间正序的 {role, content} 列表，可直接塞进消息区。
+ */
+export async function getHistory(threadId, limit = 50) {
+  const resp = await fetch(
+    `${API_BASE}/history/${encodeURIComponent(threadId)}?limit=${limit}`,
+    { headers: authHeaders() },
+  )
+  if (resp.status === 401) { clearAuth(); throw new Error('登录已过期，请重新登录') }
+  if (!resp.ok) throw new Error(`加载历史失败：HTTP ${resp.status}`)
+  const data = await resp.json()
+
+  const messages = []
+  for (const ev of data.events || []) {
+    if (ev.user_message) messages.push({ role: 'user', content: ev.user_message })
+    if (ev.agent_reply) messages.push({ role: 'assistant', content: ev.agent_reply })
+  }
+  return messages
 }
 
 // ===== 工具/健康 =====
