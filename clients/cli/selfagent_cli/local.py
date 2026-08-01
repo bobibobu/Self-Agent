@@ -44,6 +44,8 @@ def bootstrap(workspace: str | None = None, *, approval_mode: str | None = None)
         # Hermes 的被动学习会额外烧一次 LLM 调用，本地默认关掉，
         # 需要的人显式开
         "HERMES_LEARNING_ENABLED": "false",
+        # 编码任务步数远多于问答：25 步只够 12 个工具回合，不够用
+        "AGENT_RECURSION_LIMIT": "80",
     }
     if approval_mode:
         defaults["TOOL_APPROVAL_MODE"] = approval_mode
@@ -58,6 +60,7 @@ def bootstrap(workspace: str | None = None, *, approval_mode: str | None = None)
 
 async def setup_agent() -> dict:
     """初始化本地 Agent，返回一份能力概览供 CLI 展示。"""
+    from app.agent.plan import PLAN_TOOLS
     from app.agent.registry import ToolRisk, register_tools, risk_map
     from app.agent.tools.files import READ_TOOLS, WRITE_TOOLS
     from app.agent.tools.shell import SHELL_TOOLS
@@ -69,6 +72,7 @@ async def setup_agent() -> dict:
     register_tools(READ_TOOLS, ToolRisk.READ)
     register_tools(WRITE_TOOLS, ToolRisk.WRITE)
     register_tools(SHELL_TOOLS, ToolRisk.EXEC)
+    register_tools(PLAN_TOOLS, ToolRisk.READ)   # 计划只是记事板，不必审批
 
     # Skill 的工具也并进来
     s = get_settings()

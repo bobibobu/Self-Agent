@@ -18,6 +18,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.types import StreamWriter, interrupt
 from opentelemetry.trace import StatusCode
 
+from app.agent.plan import StateUpdate
 from app.agent.registry import ToolRisk, get_risk, get_tool
 from app.agent.state import AgentState
 from app.core.config import get_settings
@@ -85,7 +86,7 @@ def _denied_by_policy(name: str) -> str | None:
     return None
 
 
-async def _run_one(call: dict, writer: StreamWriter, limit: int) -> ToolMessage:
+async def _run_one(call: dict, writer: StreamWriter, limit: int) -> tuple[ToolMessage, dict]:
     """执行单个 tool_call，任何异常都转成 ToolMessage 交回模型。"""
     name = call["name"]
     args = call.get("args", {})
@@ -96,7 +97,7 @@ async def _run_one(call: dict, writer: StreamWriter, limit: int) -> ToolMessage:
     if denial:
         logger.warning("工具 %s 被策略拒绝", name)
         writer({"type": "tool_denied", "name": name, "reason": denial})
-        return ToolMessage(content=f"错误：{denial}", tool_call_id=call_id, name=name)
+        return ToolMessage(content=f"错误：{denial}", tool_call_id=call_id, name=name), {}
 
     # 人在回路：写文件、跑命令这类不可逆操作，执行前必须让用户确认。
     # interrupt() 会挂起整张图并把 payload 抛给客户端，用户决策后
@@ -119,7 +120,7 @@ async def _run_one(call: dict, writer: StreamWriter, limit: int) -> ToolMessage:
             return ToolMessage(
                 content=f"错误：{name} 需要用户审批，但当前环境无法发起审批（{e}）。已拒绝执行。",
                 tool_call_id=call_id, name=name,
-            )
+            ), {}
         approved, reason = _parse_decision(decision)
         if not approved:
             logger.info("用户拒绝了工具调用 %s：%s", name, reason)
@@ -127,7 +128,7 @@ async def _run_one(call: dict, writer: StreamWriter, limit: int) -> ToolMessage:
             # 把拒绝原因交回模型，它可以换个做法而不是硬撞
             return ToolMessage(
                 content=f"用户拒绝了此操作。原因：{reason}", tool_call_id=call_id, name=name,
-            )
+            ), {}
 
     writer({"type": "tool_start", "name": name, "args": args})
 
@@ -152,6 +153,13 @@ async def _run_one(call: dict, writer: StreamWriter, limit: int) -> ToolMessage:
                 sp.set_status(StatusCode.ERROR, str(e))
                 output = f"工具执行出错：{e}"
 
+        # 工具可以返回 StateUpdate 来同时更新图状态（如 update_plan 维护任务计划）。
+        # 用统一约定而不是按工具名特判：以后再有需要改状态的工具照此返回即可。
+        state_updates: dict = {}
+        if isinstance(output, StateUpdate):
+            state_updates = output.updates
+            output = output.text
+
         raw = str(output)
         output_str = _truncate(raw, limit)
         sp.set_attribute(ATTR_TOOL_RESULT_CHARS, len(raw))
@@ -159,7 +167,10 @@ async def _run_one(call: dict, writer: StreamWriter, limit: int) -> ToolMessage:
         record_content(sp, "gen_ai.tool.result", output_str)
 
     writer({"type": "tool_result", "name": name, "content": output_str[:500]})
-    return ToolMessage(content=output_str, tool_call_id=call_id, name=name)
+    if "plan" in state_updates:
+        # 单独推一个事件，让客户端能把计划渲染成常驻面板而不是滚动日志
+        writer({"type": "plan_updated", "plan": state_updates["plan"]})
+    return ToolMessage(content=output_str, tool_call_id=call_id, name=name), state_updates
 
 
 async def tools_node(state: AgentState, config: RunnableConfig, writer: StreamWriter) -> dict:
@@ -177,9 +188,15 @@ async def tools_node(state: AgentState, config: RunnableConfig, writer: StreamWr
 
     limit = get_settings().tool_result_max_chars
     results = await asyncio.gather(*(_run_one(c, writer, limit) for c in tool_calls))
+
     # 顺序必须与 tool_calls 一致：OpenAI/Anthropic 都要求每个 tool_call_id
     # 有且仅有一条对应的结果消息，gather 保序正好满足
-    return {"messages": list(results)}
+    messages = [msg for msg, _ in results]
+    # 合并各工具产生的状态更新（如 update_plan 写入的 plan）
+    updates: dict = {}
+    for _, upd in results:
+        updates.update(upd)
+    return {"messages": messages, **updates}
 
 
 def should_use_tools(state: AgentState) -> str:

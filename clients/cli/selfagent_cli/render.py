@@ -84,11 +84,32 @@ def _ask() -> str:
         console.print("[yellow]请输入 y / n / a[/]")
 
 
+_PLAN_STYLE = {"completed": ("✔", "green"), "in_progress": ("▶", "cyan"), "pending": ("○", "dim")}
+
+
+def render_plan(plan: list[dict]) -> None:
+    """把任务计划渲染成面板。长任务里这是用户唯一能看清「它打算干什么」的地方。"""
+    if not plan:
+        return
+    body = Text()
+    for step in plan:
+        icon, style = _PLAN_STYLE.get(step.get("status", "pending"), ("○", "dim"))
+        body.append(f"{icon} ", style=style)
+        body.append(step.get("content", "") + "\n",
+                    style="dim strike" if step.get("status") == "completed" else style)
+    done = sum(1 for s in plan if s.get("status") == "completed")
+    console.print(Panel(
+        body, title=f"任务计划 {done}/{len(plan)}", border_style="blue", expand=False,
+    ))
+
+
 def render_event(event: dict, state: dict) -> None:
     """渲染一个非 token 事件。token 由调用方用 Live 增量渲染。"""
     etype = event.get("type")
 
-    if etype == "tool_calls":
+    if etype == "plan_updated":
+        render_plan(event.get("plan") or [])
+    elif etype == "tool_calls":
         names = ", ".join(c.get("name", "?") for c in event.get("calls", []))
         console.print(f"[dim]🔧 决定调用：{names}[/]")
     elif etype == "tool_start":

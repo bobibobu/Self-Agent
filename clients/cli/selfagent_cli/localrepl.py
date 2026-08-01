@@ -17,7 +17,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
 
-from selfagent_cli.render import render_approval, render_event
+from selfagent_cli.render import render_approval, render_event, render_plan
 
 console = Console()
 
@@ -30,9 +30,11 @@ class LocalSession:
         self.thread_id = f"local-{uuid.uuid4().hex[:12]}"
         # 用户选了"总是允许"的工具，本次进程内不再询问
         self.always_allow: set[str] = set()
+        self.plan: list[dict] = []
 
     def reset(self) -> None:
         self.thread_id = f"local-{uuid.uuid4().hex[:12]}"
+        self.plan = []
 
 
 def _banner(info: dict) -> None:
@@ -89,6 +91,8 @@ async def _drive(session: LocalSession, message: str) -> None:
                         text.append(event["reply"])
                         live.update(text)
                 else:
+                    if etype == "plan_updated":
+                        session.plan = event.get("plan") or []
                     live.stop()
                     render_event(event, {})
                     live.start()
@@ -171,6 +175,7 @@ async def _handle_local_command(session: LocalSession, raw: str) -> bool:
     if cmd == "help":
         console.print(Panel(
             "  /new       开始新对话（清空上下文）\n"
+            "  /plan      查看当前任务计划\n"
             "  /tools     列出可用工具与风险等级\n"
             "  /info      显示工作区 / 沙箱 / 审批状态\n"
             "  /trust     查看本次会话已授权免问的工具\n"
@@ -186,6 +191,11 @@ async def _handle_local_command(session: LocalSession, raw: str) -> bool:
             console.print(f"  [{color}]{risk:<6}[/] {name}")
     elif cmd == "info":
         _banner(session.info)
+    elif cmd == "plan":
+        if session.plan:
+            render_plan(session.plan)
+        else:
+            console.print("[dim]当前没有计划（简单任务不需要）[/]")
     elif cmd == "trust":
         if session.always_allow:
             console.print("本次会话免问的工具：" + "、".join(sorted(session.always_allow)))

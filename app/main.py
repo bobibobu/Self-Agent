@@ -52,6 +52,7 @@ async def lifespan(app: FastAPI):
     # 注册编码类工具（文件 + Shell）。风险等级由各工具的 metadata 声明，
     # 写与执行默认要经用户审批（TOOL_APPROVAL_MODE=gated）。
     if settings.coding_tools_enabled:
+        from app.agent.plan import PLAN_TOOLS
         from app.agent.registry import ToolRisk, register_tools
         from app.agent.tools.files import READ_TOOLS, WRITE_TOOLS
         from app.agent.tools.shell import SHELL_TOOLS
@@ -60,7 +61,8 @@ async def lifespan(app: FastAPI):
         ws = get_workspace()
         n = (register_tools(READ_TOOLS, ToolRisk.READ)
              + register_tools(WRITE_TOOLS, ToolRisk.WRITE)
-             + register_tools(SHELL_TOOLS, ToolRisk.EXEC))
+             + register_tools(SHELL_TOOLS, ToolRisk.EXEC)
+             + register_tools(PLAN_TOOLS, ToolRisk.READ))  # 计划只是记事板，不必审批
         logger.info("✅ 编码工具已注册（%d 个），工作区：%s，审批策略：%s",
                     n, ws.root, settings.tool_approval_mode)
 

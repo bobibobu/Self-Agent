@@ -1,7 +1,9 @@
 # Self-Agent
 
 > 企业级 AI Agent —— 基于 LangGraph + MCP + A2A + 多协议 LLM 的完整实战项目。
-> 面向**学习与企业面试**：每个模块都配有详细文档与设计说明。
+> 既是能在你项目目录里干活的**编码 Agent CLI**，也是一套可部署的**多用户 Agent 服务**。
+>
+> 📖 **[完整功能说明 · 使用手册 · 项目结构 → docs/00-overview](docs/00-overview/README.md)**
 
 ---
 
@@ -14,6 +16,7 @@
 - **多类型记忆系统**：PostgreSQL(对话状态/长期记忆) + Redis(缓存) + Neo4j(用户画像图谱) + MongoDB(日志)
 - **企业级工程化**：全程类型注解、结构化日志、配置即代码、Docker 一键起所有基础设施
 - **可观测**：OpenTelemetry 链路追踪，一轮对话的 LLM 调用 / 工具执行 / 检索耗时一目了然
+- **编码 Agent**：工作区禁闭 + 文件/Shell 工具 + 执行前审批 + 命令沙箱 + 任务计划
 
 ## 🏗 技术栈
 
@@ -25,7 +28,7 @@
 | 数据库 | PostgreSQL · MongoDB · Redis · Neo4j |
 | 协议 | MCP · A2A |
 | 可观测 | OpenTelemetry（GenAI 语义约定）· Jaeger |
-| 编码能力 | 工作区禁闭 · 文件读写 · Shell 执行 · 审批闸门 · 沙箱隔离 |
+| 编码能力 | 工作区禁闭 · 文件读写 · Shell 执行 · 审批闸门 · 沙箱隔离 · 任务计划 |
 | 包管理 | uv |
 
 ## 🚀 5 分钟快速开始
@@ -162,6 +165,7 @@ curl -X POST http://localhost:8000/chat/http-stream ... # NDJSON 流式
 
 ## 📚 文档导航
 
+- **[项目总览：功能点 · 使用说明 · 项目结构](docs/00-overview/README.md)** ← 从这里开始
 - [架构总览](docs/01-architecture/README.md)
 - [环境搭建指南](docs/03-development/01-setup.md)
 - [LLM 多协议设计](docs/02-modules/01-llm-layer.md)
@@ -177,6 +181,9 @@ curl -X POST http://localhost:8000/chat/http-stream ... # NDJSON 流式
 - [x] **Phase 6** —— ★真·token 流式（SSE + NDJSON）+ Hermes 自我进化 + Web/CLI 客户端
 - [x] **Phase 7** —— ★会话管理（CRUD）+ dev 持久化 + 上下文压缩 + 流式中断
 - [x] **Phase 8** —— ★用户认证(JWT) + 多租户 + 限流 + RAG知识库 + 文件上传 + 用量统计 + 可观测
+- [x] **Phase 9** —— ★OpenTelemetry 链路追踪
+- [x] **Phase 10** —— ★编码 Agent：工作区 + 文件/Shell 工具 + 审批闸门 + 命令沙箱
+- [x] **Phase 11** —— ★CLI 本地模式（内嵌 Agent + SQLite）+ 任务计划层
 
 ## 🔭 链路追踪
 
@@ -241,7 +248,7 @@ cd infra && docker compose up -d --force-recreate postgres
 | JWT | 无吊销名单，改密码/登出无法使已签发 token 失效（token 里已留 `jti` 锚点） |
 | Hermes 进化 | 采纳与否只依据 LLM 自评分，没有评测集把关；反思样本取自全部对话，存在提示词注入面（已限管理员触发） |
 | 沙箱 | 已实现（bubblewrap / Landlock 分层降级）。但 Landlock 后端**只管文件系统不限制网络**；两者都不做 syscall 过滤，未防提权类攻击 |
-| 长任务 | 单层 ReAct 循环，没有计划/TODO 分解，复杂多步任务会在 recursion_limit 内失败 |
+| 长任务 | 已有计划/TODO 层，但仍是单层 ReAct，无子 Agent / 并行分解 |
 | 流式契约 | `stream_agent` 的事件流**必须消费完**，中途 break 会丢掉审批中断状态（有回归测试钉住） |
 | 多模态 | 图片能上传，但 LLM 层 `ChatMessage.content` 只支持纯文本，图片进不了对话 |
 | 部署 | 无应用自身的 Dockerfile，无 CI |
