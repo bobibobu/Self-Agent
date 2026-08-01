@@ -6,10 +6,12 @@
 
 | 模块 | 文档 | Phase | 状态 |
 |---|---|---|---|
+| 编码工具与安全层 | 见 [架构总览·安全层](../01-architecture/README.md) 与 [从零读懂·第2章](../00-overview/02-从零读懂.md) | P10 | ✅ 已完成 |
+| 本地模式与任务计划 | 见 [从零读懂·第3章](../00-overview/02-从零读懂.md) | P11 | ✅ 已完成 |
 | LLM 多协议抽象层 | [01-llm-layer.md](01-llm-layer.md) | P1 | ✅ 已完成 |
 | LangGraph Agent 编排 | [02-agent-graph.md](02-agent-graph.md) | P1 | ✅ 已完成 |
 | 记忆系统 | [03-memory.md](03-memory.md) | P3 | ✅ 已完成 |
-| 基础设施与数据库 | [../04-guides/01-infrastructure.md](../04-guides/01-infrastructure.md) | P1 | ✅ 已完成 |
+| 基础设施与数据库 | [infra/README.md](../../infra/README.md) | P1 | ✅ 已完成 |
 | MCP 协议集成 | [04-mcp.md](04-mcp.md) | P2 | ✅ 已完成 |
 | Skill 系统 | [05-skills.md](05-skills.md) | P2 | ✅ 已完成 |
 | 用户画像 | [06-user-profile.md](06-user-profile.md) | P3 | ✅ 已完成 |

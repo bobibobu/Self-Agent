@@ -3,7 +3,8 @@
 > 企业级 AI Agent —— 基于 LangGraph + MCP + A2A + 多协议 LLM 的完整实战项目。
 > 既是能在你项目目录里干活的**编码 Agent CLI**，也是一套可部署的**多用户 Agent 服务**。
 >
-> 📖 **[完整功能说明 · 使用手册 · 项目结构 → docs/00-overview](docs/00-overview/README.md)**
+> 🔰 **新人入门** → [从零读懂 Self-Agent](docs/00-overview/02-从零读懂.md)（概念 + 完整链路 + 代码阅读路径）
+> 📖 **参考手册** → [功能说明 · 使用手册 · 项目结构](docs/00-overview/README.md)
 
 ---
 
@@ -165,7 +166,8 @@ curl -X POST http://localhost:8000/chat/http-stream ... # NDJSON 流式
 
 ## 📚 文档导航
 
-- **[项目总览：功能点 · 使用说明 · 项目结构](docs/00-overview/README.md)** ← 从这里开始
+- **[从零读懂 Self-Agent](docs/00-overview/02-从零读懂.md)** ← 零基础从这里开始
+- **[项目总览：功能点 · 使用说明 · 项目结构](docs/00-overview/README.md)** ← 参考手册
 - [架构总览](docs/01-architecture/README.md)
 - [环境搭建指南](docs/03-development/01-setup.md)
 - [LLM 多协议设计](docs/02-modules/01-llm-layer.md)
