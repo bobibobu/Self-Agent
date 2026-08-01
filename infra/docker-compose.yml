@@ -26,7 +26,7 @@ services:
     # 用 pgvector 镜像而不是原版 postgres：LangGraph 的 PostgresStore 建
     # 语义索引时需要 vector 扩展，原版镜像里没有，store.setup() 会失败
     # （应用会降级成「持久化但无语义检索」，见 app/memory/store.py）。
-    image: pgvector/pgvector:pg16
+    image: docker.m.daocloud.io/pgvector/pgvector:pg16
     container_name: selfagent-postgres
     restart: unless-stopped
     environment:
@@ -100,7 +100,7 @@ services:
   #   all-in-one 是内存存储，重启丢数据——开发够用，生产要换带持久化的部署。
   # -----------------------------------------------------------------
   jaeger:
-    image: jaegertracing/all-in-one:1.62.0
+    image: docker.m.daocloud.io/jaegertracing/all-in-one:1.62.0
     container_name: selfagent-jaeger
     restart: unless-stopped
     environment:
