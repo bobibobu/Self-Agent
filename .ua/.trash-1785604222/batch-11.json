@@ -1,0 +1,77 @@
+{
+  "nodes": [
+    {
+      "id": "document:clients/web/README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "clients/web/README.md",
+      "summary": "Chinese-language documentation for the Self-Agent web chat client (React + Vite), covering quick-start setup, SSE streaming architecture, the event protocol (token/tool_calls/tool_start/tool_result/done/error), production deployment, and configuration. Explicitly references the SSE implementation in src/api.js and the Vite proxy in vite.config.js.",
+      "tags": ["documentation", "web-client", "sse-streaming", "onboarding", "react"],
+      "complexity": "moderate",
+      "languageNotes": "Written in Chinese (zh-CN). The 'How it works' section documents why fetch + ReadableStream is used instead of native EventSource (POST body requirement) and maps the SSE event types consumed by the chat UI."
+    },
+    {
+      "id": "file:clients/web/index.html",
+      "type": "file",
+      "name": "index.html",
+      "filePath": "clients/web/index.html",
+      "summary": "Vite HTML entry point for the web client; defines the #root mount node and loads /src/main.jsx as a module script to bootstrap the React application.",
+      "tags": ["entry-point", "html", "vite-entry", "react-mount", "markup"],
+      "complexity": "simple",
+      "languageNotes": "Follows the Vite convention where index.html is the build entry and the referenced module script is bundled by Vite; document lang is zh-CN."
+    },
+    {
+      "id": "config:clients/web/package.json",
+      "type": "config",
+      "name": "package.json",
+      "filePath": "clients/web/package.json",
+      "summary": "npm manifest for the self-agent-web client, declaring runtime dependencies (react, react-dom, react-markdown) and Vite 5 dev tooling, with dev/build/preview scripts that drive the Vite bundler.",
+      "tags": ["configuration", "build-system", "npm-manifest", "react", "vite"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:clients/web/index.html",
+      "target": "file:clients/web/src/main.jsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:clients/web/README.md",
+      "target": "file:clients/web/src/api.js",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:clients/web/README.md",
+      "target": "file:clients/web/vite.config.js",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:clients/web/README.md",
+      "target": "file:clients/web/src/main.jsx",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:clients/web/package.json",
+      "target": "file:clients/web/src/main.jsx",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:clients/web/package.json",
+      "target": "file:clients/web/index.html",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ]
+}

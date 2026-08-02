@@ -1,0 +1,55 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 1,
+  "filesSkipped": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 1,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 1
+    }
+  },
+  "results": [
+    {
+      "path": "infra/postgres/migrations/001_fix_conversations_schema.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 41,
+      "nonEmptyLines": 35,
+      "definitions": [
+        {
+          "name": "idx_conversations_tenant_thread",
+          "kind": "index",
+          "fields": [],
+          "startLine": 33,
+          "endLine": 33
+        },
+        {
+          "name": "idx_conversations_tenant_user",
+          "kind": "index",
+          "fields": [],
+          "startLine": 37,
+          "endLine": 37
+        },
+        {
+          "name": "idx_conversations_tenant_updated",
+          "kind": "index",
+          "fields": [],
+          "startLine": 38,
+          "endLine": 38
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 3
+      }
+    }
+  ]
+}

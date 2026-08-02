@@ -1,0 +1,15 @@
+{
+  "projectRoot": "e:/AIwork/Self-Agent",
+  "batchFiles": [
+    {"path": "clients/web/src/App.jsx", "language": "javascript", "sizeLines": 270, "fileCategory": "code"},
+    {"path": "clients/web/src/Login.jsx", "language": "javascript", "sizeLines": 79, "fileCategory": "code"},
+    {"path": "clients/web/src/api.js", "language": "javascript", "sizeLines": 252, "fileCategory": "code"},
+    {"path": "clients/web/src/main.jsx", "language": "javascript", "sizeLines": 10, "fileCategory": "code"}
+  ],
+  "batchImportData": {
+    "clients/web/src/App.jsx": ["clients/web/src/App.css", "clients/web/src/Login.jsx", "clients/web/src/api.js"],
+    "clients/web/src/Login.jsx": ["clients/web/src/api.js"],
+    "clients/web/src/api.js": [],
+    "clients/web/src/main.jsx": ["clients/web/src/App.jsx", "clients/web/src/index.css"]
+  }
+}

@@ -1,0 +1,426 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 3,
+  "filesSkipped": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 3,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 3,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "app/skills/base.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 69,
+      "nonEmptyLines": 52,
+      "classes": [
+        {
+          "name": "SkillMeta",
+          "startLine": 17,
+          "endLine": 25,
+          "methods": [],
+          "properties": [
+            "name",
+            "description",
+            "version",
+            "tags",
+            "author",
+            "enabled_by_default"
+          ]
+        },
+        {
+          "name": "SkillBase",
+          "startLine": 28,
+          "endLine": 69,
+          "methods": [
+            "on_load",
+            "on_unload",
+            "tool_names",
+            "describe"
+          ],
+          "properties": [
+            "meta",
+            "tools",
+            "prompt"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "SkillMeta",
+          "line": 17,
+          "isDefault": false
+        },
+        {
+          "name": "SkillBase",
+          "line": 28,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "describe",
+          "callee": "SkillMeta",
+          "lineNumber": 60
+        },
+        {
+          "caller": "describe",
+          "callee": "bool",
+          "lineNumber": 68
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 2
+      }
+    },
+    {
+      "path": "app/skills/builtin.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 78,
+      "nonEmptyLines": 63,
+      "functions": [
+        {
+          "name": "advanced_math",
+          "startLine": 21,
+          "endLine": 56,
+          "params": [
+            "expression"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "MathSkill",
+          "startLine": 66,
+          "endLine": 78,
+          "methods": [
+            "on_load"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "advanced_math",
+          "line": 20,
+          "isDefault": false
+        },
+        {
+          "name": "MathSkill",
+          "line": 59,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "_eval",
+          "callee": "isinstance",
+          "lineNumber": 40
+        },
+        {
+          "caller": "_eval",
+          "callee": "_eval",
+          "lineNumber": 41
+        },
+        {
+          "caller": "_eval",
+          "callee": "isinstance",
+          "lineNumber": 42
+        },
+        {
+          "caller": "_eval",
+          "callee": "isinstance",
+          "lineNumber": 42
+        },
+        {
+          "caller": "_eval",
+          "callee": "isinstance",
+          "lineNumber": 44
+        },
+        {
+          "caller": "_eval",
+          "callee": "type",
+          "lineNumber": 45
+        },
+        {
+          "caller": "_eval",
+          "callee": "_eval",
+          "lineNumber": 45
+        },
+        {
+          "caller": "_eval",
+          "callee": "_eval",
+          "lineNumber": 45
+        },
+        {
+          "caller": "_eval",
+          "callee": "isinstance",
+          "lineNumber": 46
+        },
+        {
+          "caller": "_eval",
+          "callee": "type",
+          "lineNumber": 47
+        },
+        {
+          "caller": "_eval",
+          "callee": "_eval",
+          "lineNumber": 47
+        },
+        {
+          "caller": "_eval",
+          "callee": "isinstance",
+          "lineNumber": 48
+        },
+        {
+          "caller": "_eval",
+          "callee": "isinstance",
+          "lineNumber": 48
+        },
+        {
+          "caller": "_eval",
+          "callee": "_eval",
+          "lineNumber": 49
+        },
+        {
+          "caller": "_eval",
+          "callee": "ValueError",
+          "lineNumber": 50
+        },
+        {
+          "caller": "_eval",
+          "callee": "ast.dump",
+          "lineNumber": 50
+        },
+        {
+          "caller": "advanced_math",
+          "callee": "_eval",
+          "lineNumber": 53
+        },
+        {
+          "caller": "advanced_math",
+          "callee": "ast.parse",
+          "lineNumber": 53
+        },
+        {
+          "caller": "on_load",
+          "callee": "get_logger(__name__).debug",
+          "lineNumber": 78
+        },
+        {
+          "caller": "on_load",
+          "callee": "get_logger",
+          "lineNumber": 78
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "app/skills/registry.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 145,
+      "nonEmptyLines": 118,
+      "functions": [
+        {
+          "name": "skill",
+          "startLine": 113,
+          "endLine": 145,
+          "params": [
+            "name",
+            "description",
+            "version",
+            "tags",
+            "author",
+            "enabled_by_default",
+            "registry"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "SkillRegistry",
+          "startLine": 27,
+          "endLine": 106,
+          "methods": [
+            "__init__",
+            "register",
+            "load",
+            "unload",
+            "load_all_defaults",
+            "list_skills",
+            "get",
+            "loaded_names"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "SkillRegistry",
+          "line": 27,
+          "isDefault": false
+        },
+        {
+          "name": "skill",
+          "line": 113,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "__init__",
+          "callee": "set",
+          "lineNumber": 34
+        },
+        {
+          "caller": "register",
+          "callee": "skill_cls",
+          "lineNumber": 39
+        },
+        {
+          "caller": "register",
+          "callee": "logger.warning",
+          "lineNumber": 42
+        },
+        {
+          "caller": "register",
+          "callee": "logger.debug",
+          "lineNumber": 44
+        },
+        {
+          "caller": "load",
+          "callee": "self._skills.get",
+          "lineNumber": 53
+        },
+        {
+          "caller": "load",
+          "callee": "logger.warning",
+          "lineNumber": 55
+        },
+        {
+          "caller": "load",
+          "callee": "logger.debug",
+          "lineNumber": 58
+        },
+        {
+          "caller": "load",
+          "callee": "skill.on_load",
+          "lineNumber": 62
+        },
+        {
+          "caller": "load",
+          "callee": "logger.warning",
+          "lineNumber": 64
+        },
+        {
+          "caller": "load",
+          "callee": "tool_registry.register_tools",
+          "lineNumber": 67
+        },
+        {
+          "caller": "load",
+          "callee": "logger.info",
+          "lineNumber": 68
+        },
+        {
+          "caller": "load",
+          "callee": "self._loaded.add",
+          "lineNumber": 70
+        },
+        {
+          "caller": "unload",
+          "callee": "self._skills.get",
+          "lineNumber": 75
+        },
+        {
+          "caller": "unload",
+          "callee": "skill.on_unload",
+          "lineNumber": 79
+        },
+        {
+          "caller": "unload",
+          "callee": "logger.warning",
+          "lineNumber": 81
+        },
+        {
+          "caller": "unload",
+          "callee": "self._loaded.discard",
+          "lineNumber": 82
+        },
+        {
+          "caller": "unload",
+          "callee": "logger.info",
+          "lineNumber": 83
+        },
+        {
+          "caller": "load_all_defaults",
+          "callee": "self._skills.items",
+          "lineNumber": 89
+        },
+        {
+          "caller": "load_all_defaults",
+          "callee": "self.load",
+          "lineNumber": 90
+        },
+        {
+          "caller": "load_all_defaults",
+          "callee": "logger.info",
+          "lineNumber": 93
+        },
+        {
+          "caller": "list_skills",
+          "callee": "s.describe",
+          "lineNumber": 99
+        },
+        {
+          "caller": "list_skills",
+          "callee": "self._skills.values",
+          "lineNumber": 99
+        },
+        {
+          "caller": "get",
+          "callee": "self._skills.get",
+          "lineNumber": 102
+        },
+        {
+          "caller": "loaded_names",
+          "callee": "sorted",
+          "lineNumber": 106
+        },
+        {
+          "caller": "skill",
+          "callee": "SkillMeta",
+          "lineNumber": 132
+        },
+        {
+          "caller": "decorator",
+          "callee": "reg.register",
+          "lineNumber": 142
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 1
+      }
+    }
+  ]
+}

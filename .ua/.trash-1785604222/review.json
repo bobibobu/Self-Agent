@@ -1,0 +1,56 @@
+{
+  "issues": [],
+  "warnings": [
+    "Node 'config:.ua/.understandignore' has no edges (orphan)",
+    "Node 'file:app/a2a/__init__.py' has no edges (orphan)",
+    "Node 'file:app/agent/nodes/__init__.py' has no edges (orphan)",
+    "Node 'file:app/api/__init__.py' has no edges (orphan)",
+    "Node 'file:app/auth/__init__.py' has no edges (orphan)",
+    "Node 'file:app/core/__init__.py' has no edges (orphan)",
+    "Node 'file:app/db/__init__.py' has no edges (orphan)",
+    "Node 'file:app/llm/providers/__init__.py' has no edges (orphan)",
+    "Node 'file:app/mcp/__init__.py' has no edges (orphan)",
+    "Node 'file:app/memory/__init__.py' has no edges (orphan)",
+    "Node 'file:app/middleware/__init__.py' has no edges (orphan)",
+    "Node 'file:app/profile/__init__.py' has no edges (orphan)",
+    "Node 'file:app/rag/__init__.py' has no edges (orphan)",
+    "Node 'file:app/services/__init__.py' has no edges (orphan)",
+    "Node 'file:app/skills/__init__.py' has no edges (orphan)",
+    "Node 'document:docs/03-development/README.md' has no edges (orphan)",
+    "Node 'document:docs/04-guides/README.md' has no edges (orphan)",
+    "Node 'document:docs/05-interview/README.md' has no edges (orphan)"
+  ],
+  "stats": {
+    "totalNodes": 421,
+    "totalEdges": 782,
+    "totalLayers": 10,
+    "tourSteps": 13,
+    "nodeTypes": {
+      "file": 111,
+      "class": 72,
+      "function": 172,
+      "endpoint": 29,
+      "table": 4,
+      "config": 8,
+      "document": 23,
+      "service": 1,
+      "schema": 1
+    },
+    "edgeTypes": {
+      "contains": 275,
+      "exports": 193,
+      "imports": 160,
+      "calls": 73,
+      "inherits": 6,
+      "implements": 2,
+      "migrates": 1,
+      "configures": 7,
+      "documents": 24,
+      "depends_on": 13,
+      "related": 12,
+      "tested_by": 11,
+      "defines_schema": 3,
+      "provisions": 2
+    }
+  }
+}

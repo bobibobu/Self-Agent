@@ -1,0 +1,13 @@
+{
+  "projectRoot": "e:/AIwork/Self-Agent",
+  "batchFiles": [
+    {"path": ".env.example", "language": "config", "sizeLines": 154, "fileCategory": "config"},
+    {"path": "README.md", "language": "markdown", "sizeLines": 260, "fileCategory": "docs"},
+    {"path": "pyproject.toml", "language": "toml", "sizeLines": 130, "fileCategory": "config"}
+  ],
+  "batchImportData": {
+    ".env.example": [],
+    "README.md": [],
+    "pyproject.toml": []
+  }
+}

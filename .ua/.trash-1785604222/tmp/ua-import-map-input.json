@@ -1,0 +1,730 @@
+{
+  "projectRoot": "e:/AIwork/Self-Agent",
+  "files": [
+    {
+      "path": ".env.example",
+      "language": "config",
+      "fileCategory": "config"
+    },
+    {
+      "path": ".ua/.understandignore",
+      "language": "unknown",
+      "fileCategory": "code"
+    },
+    {
+      "path": ".zcode/plans/plan-sess_5f557916-caa3-4e7b-8161-77e53cfd63f0.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "README.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "app/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/a2a/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/a2a/client.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/a2a/executor.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/a2a/server.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/a2a/standalone.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/agent/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/agent/cancel_registry.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/agent/context_manager.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/agent/graph.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/agent/nodes/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/agent/nodes/agent_node.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/agent/nodes/bridge.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/agent/nodes/tools_node.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/agent/plan.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/agent/prompts/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/agent/registry.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/agent/state.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/agent/tools/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/agent/tools/files.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/agent/tools/shell.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/api/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/api/routes.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/api/schemas.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/api/upload_routes.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/auth/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/auth/dependencies.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/auth/jwt_service.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/auth/routes.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/auth/tenant.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/auth/user_service.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/core/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/core/config.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/core/exceptions.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/core/logging.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/core/telemetry.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/db/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/db/manager.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/evolution/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/evolution/memory_learner.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/evolution/prompt_store.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/evolution/reflector.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/llm/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/llm/base.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/llm/factory.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/llm/models.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/llm/providers/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/llm/providers/anthropic.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/llm/providers/openai_like.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/logging_service/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/main.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/mcp/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/mcp/client.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/mcp/server.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/memory/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/memory/checkpointer.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/memory/embeddings.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/memory/local_store.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/memory/pg.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/memory/store.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/middleware/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/middleware/rate_limit.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/profile/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/profile/service.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/rag/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/rag/routes.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/rag/service.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/sandbox.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/services/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/services/observability.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/services/session_service.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/services/stats_service.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/skills/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/skills/base.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/skills/builtin.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/skills/registry.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/workspace.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "clients/cli/README.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "clients/cli/pyproject.toml",
+      "language": "toml",
+      "fileCategory": "config"
+    },
+    {
+      "path": "clients/cli/selfagent_cli/__init__.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "clients/cli/selfagent_cli/api.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "clients/cli/selfagent_cli/config.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "clients/cli/selfagent_cli/local.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "clients/cli/selfagent_cli/localrepl.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "clients/cli/selfagent_cli/main.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "clients/cli/selfagent_cli/render.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "clients/web/README.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "clients/web/index.html",
+      "language": "html",
+      "fileCategory": "markup"
+    },
+    {
+      "path": "clients/web/package.json",
+      "language": "json",
+      "fileCategory": "config"
+    },
+    {
+      "path": "clients/web/src/App.css",
+      "language": "css",
+      "fileCategory": "markup"
+    },
+    {
+      "path": "clients/web/src/App.jsx",
+      "language": "javascript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "clients/web/src/Login.jsx",
+      "language": "javascript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "clients/web/src/api.js",
+      "language": "javascript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "clients/web/src/index.css",
+      "language": "css",
+      "fileCategory": "markup"
+    },
+    {
+      "path": "clients/web/src/main.jsx",
+      "language": "javascript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "clients/web/vite.config.js",
+      "language": "javascript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "docs/00-overview/02-从零读懂.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/00-overview/README.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/01-architecture/README.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/02-modules/01-llm-layer.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/02-modules/02-agent-graph.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/02-modules/03-memory.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/02-modules/04-mcp.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/02-modules/05-skills.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/02-modules/06-user-profile.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/02-modules/07-a2a.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/02-modules/08-hermes-evolution.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/02-modules/09-auth-tenant.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/02-modules/10-rag-enterprise.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/02-modules/README.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/03-development/01-setup.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/03-development/README.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/04-guides/README.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/05-interview/README.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "infra/README.md",
+      "language": "markdown",
+      "fileCategory": "docs"
+    },
+    {
+      "path": "infra/docker-compose.yml",
+      "language": "yaml",
+      "fileCategory": "infra"
+    },
+    {
+      "path": "infra/mongo/init.js",
+      "language": "javascript",
+      "fileCategory": "code"
+    },
+    {
+      "path": "infra/postgres/init.sql",
+      "language": "sql",
+      "fileCategory": "data"
+    },
+    {
+      "path": "infra/postgres/migrations/001_fix_conversations_schema.sql",
+      "language": "sql",
+      "fileCategory": "data"
+    },
+    {
+      "path": "mcp_servers.json.example",
+      "language": "example",
+      "fileCategory": "code"
+    },
+    {
+      "path": "pyproject.toml",
+      "language": "toml",
+      "fileCategory": "config"
+    },
+    {
+      "path": "scripts/cleanup_test_data.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/verify_agent.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/verify_e2e.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/verify_hermes.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/verify_phase2.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/verify_phase3.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/verify_phase4.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/verify_phase8.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/verify_sessions.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/verify_stream.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/conftest.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_api_smoke.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_client_contract.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_coding_tools.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_local_mode.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_plan.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_regressions.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_sandbox.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_telemetry.py",
+      "language": "python",
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_unit.py",
+      "language": "python",
+      "fileCategory": "code"
+    }
+  ]
+}

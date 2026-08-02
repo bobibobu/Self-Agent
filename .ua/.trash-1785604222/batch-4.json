@@ -1,0 +1,657 @@
+{
+  "nodes": [
+    {
+      "id": "file:app/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "app/__init__.py",
+      "summary": "Root package marker for the Self-Agent application; exposes the __version__ string consumed by health checks and logging.",
+      "tags": ["entry-point", "package-marker", "versioning"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:app/api/routes.py",
+      "type": "file",
+      "name": "routes.py",
+      "filePath": "app/api/routes.py",
+      "summary": "Primary FastAPI APIRouter exposing the full HTTP surface: chat (blocking, SSE, and NDJSON streaming), long-term memory, user profile, session CRUD, conversation history, Hermes prompt evolution, and admin usage/metrics endpoints.",
+      "tags": ["api-handler", "router", "rest-api", "streaming", "fastapi"],
+      "complexity": "complex",
+      "languageNotes": "Auth via FastAPI Depends(get_current_user); tenant-scoped user/thread IDs prevent cross-tenant IDOR; many service imports are lazy (inside handlers) to avoid circular imports."
+    },
+    {
+      "id": "file:app/api/schemas.py",
+      "type": "file",
+      "name": "schemas.py",
+      "filePath": "app/api/schemas.py",
+      "summary": "Pydantic request/response models defining the API data contract for chat, health, memory, and profile endpoints.",
+      "tags": ["data-model", "pydantic", "api-schema", "validation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:app/auth/dependencies.py",
+      "type": "file",
+      "name": "dependencies.py",
+      "filePath": "app/auth/dependencies.py",
+      "summary": "FastAPI authentication dependencies: JWT-based CurrentUser resolution, admin enforcement, optional auth for dev mode, and owner/anon resource-access guards.",
+      "tags": ["middleware", "authentication", "authorization", "fastapi-depends"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:app/auth/jwt_service.py",
+      "type": "file",
+      "name": "jwt_service.py",
+      "filePath": "app/auth/jwt_service.py",
+      "summary": "JWT token creation/verification with bcrypt password hashing, admin-role detection from configured usernames, and Bearer header extraction.",
+      "tags": ["authentication", "jwt", "bcrypt", "security"],
+      "complexity": "moderate",
+      "languageNotes": "Uses PyJWT + bcrypt; admin role derived from the configured admin_usernames list rather than a DB column."
+    },
+    {
+      "id": "file:app/auth/routes.py",
+      "type": "file",
+      "name": "routes.py",
+      "filePath": "app/auth/routes.py",
+      "summary": "Auth APIRouter with register/login/me endpoints issuing JWTs; tenant is resolved server-side from request headers and credentials are accepted only via the request body to avoid logging.",
+      "tags": ["api-handler", "authentication", "router", "jwt"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:app/auth/tenant.py",
+      "type": "file",
+      "name": "tenant.py",
+      "filePath": "app/auth/tenant.py",
+      "summary": "Multi-tenant isolation primitives: tenant resolution from request headers, allowed-tenant enforcement, and tenant-scoped user/thread/memory ID namespaces.",
+      "tags": ["multi-tenant", "isolation", "security", "namespace"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:app/auth/user_service.py",
+      "type": "file",
+      "name": "user_service.py",
+      "filePath": "app/auth/user_service.py",
+      "summary": "UserService performing user registration, password authentication, and lookup against the database pool; accessed via the get_user_service factory.",
+      "tags": ["service", "user-management", "database", "authentication"],
+      "complexity": "moderate"
+    },
+
+    {
+      "id": "endpoint:app/api/routes.py:GET-/health",
+      "type": "endpoint",
+      "name": "GET /health",
+      "filePath": "app/api/routes.py",
+      "lineRange": [41, 48],
+      "summary": "Liveness probe returning the app name, version, and default LLM provider.",
+      "tags": ["endpoint", "health-check", "system"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:GET-/tools",
+      "type": "endpoint",
+      "name": "GET /tools",
+      "filePath": "app/api/routes.py",
+      "lineRange": [52, 69],
+      "summary": "Lists all Agent tools (built-in + MCP + Skills) with risk levels and the configured approval mode.",
+      "tags": ["endpoint", "tools", "mcp", "capabilities"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:GET-/skills",
+      "type": "endpoint",
+      "name": "GET /skills",
+      "filePath": "app/api/routes.py",
+      "lineRange": [73, 78],
+      "summary": "Lists registered Skills and their loaded status.",
+      "tags": ["endpoint", "skills", "capabilities"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:POST-/chat",
+      "type": "endpoint",
+      "name": "POST /chat",
+      "filePath": "app/api/routes.py",
+      "lineRange": [82, 106],
+      "summary": "Blocking chat: runs the LangGraph agent to completion (with memory/profile injection) and returns the full reply, thread_id, and provider.",
+      "tags": ["endpoint", "chat", "agent", "api-handler"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:POST-/chat/stream",
+      "type": "endpoint",
+      "name": "POST /chat/stream",
+      "filePath": "app/api/routes.py",
+      "lineRange": [110, 128],
+      "summary": "Streaming chat over SSE (EventSource) yielding token-level and tool-call events for browser clients.",
+      "tags": ["endpoint", "chat", "streaming", "sse"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:POST-/chat/http-stream",
+      "type": "endpoint",
+      "name": "POST /chat/http-stream",
+      "filePath": "app/api/routes.py",
+      "lineRange": [132, 150],
+      "summary": "Streaming chat over NDJSON (StreamingResponse) for CLI and non-browser clients.",
+      "tags": ["endpoint", "chat", "streaming", "ndjson"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:POST-/memory",
+      "type": "endpoint",
+      "name": "POST /memory",
+      "filePath": "app/api/routes.py",
+      "lineRange": [157, 164],
+      "summary": "Stores a long-term memory entry for the authenticated user (tenant-scoped).",
+      "tags": ["endpoint", "memory", "storage"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:GET-/memory/{user_id}",
+      "type": "endpoint",
+      "name": "GET /memory/{user_id}",
+      "filePath": "app/api/routes.py",
+      "lineRange": [168, 176],
+      "summary": "Semantic search of a user's long-term memories; owner-checked when auth is enabled.",
+      "tags": ["endpoint", "memory", "search"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:GET-/memory/{user_id}/all",
+      "type": "endpoint",
+      "name": "GET /memory/{user_id}/all",
+      "filePath": "app/api/routes.py",
+      "lineRange": [180, 188],
+      "summary": "Lists all long-term memories for a user; owner-checked.",
+      "tags": ["endpoint", "memory", "list"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:DELETE-/memory/{user_id}/{key}",
+      "type": "endpoint",
+      "name": "DELETE /memory/{user_id}/{key}",
+      "filePath": "app/api/routes.py",
+      "lineRange": [192, 200],
+      "summary": "Deletes a specific user memory by key; owner-checked.",
+      "tags": ["endpoint", "memory", "delete"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:POST-/profile/interest",
+      "type": "endpoint",
+      "name": "POST /profile/interest",
+      "filePath": "app/api/routes.py",
+      "lineRange": [207, 214],
+      "summary": "Records a user interest into the profile service under the tenant-scoped identity.",
+      "tags": ["endpoint", "profile", "user-data"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:POST-/profile/preference",
+      "type": "endpoint",
+      "name": "POST /profile/preference",
+      "filePath": "app/api/routes.py",
+      "lineRange": [218, 225],
+      "summary": "Records a user key/value preference under the tenant-scoped identity.",
+      "tags": ["endpoint", "profile", "user-data"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:GET-/profile/{user_id}",
+      "type": "endpoint",
+      "name": "GET /profile/{user_id}",
+      "filePath": "app/api/routes.py",
+      "lineRange": [229, 238],
+      "summary": "Retrieves the full user profile; owner-checked and tenant-scoped.",
+      "tags": ["endpoint", "profile", "user-data"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:GET-/history/{thread_id}",
+      "type": "endpoint",
+      "name": "GET /history/{thread_id}",
+      "filePath": "app/api/routes.py",
+      "lineRange": [245, 268],
+      "summary": "Fetches conversation event history for a session from MongoDB; enforces tenant + ownership to prevent IDOR.",
+      "tags": ["endpoint", "history", "conversation", "security"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:POST-/chat/cancel/{thread_id}",
+      "type": "endpoint",
+      "name": "POST /chat/cancel/{thread_id}",
+      "filePath": "app/api/routes.py",
+      "lineRange": [272, 286],
+      "summary": "Cancels an in-progress streaming generation; owner-checked so users cannot interrupt others' sessions.",
+      "tags": ["endpoint", "chat", "cancel", "security"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:GET-/sessions",
+      "type": "endpoint",
+      "name": "GET /sessions",
+      "filePath": "app/api/routes.py",
+      "lineRange": [299, 309],
+      "summary": "Lists chat sessions, tenant-scoped and restricted to the caller's own when authenticated.",
+      "tags": ["endpoint", "session", "list"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:POST-/sessions",
+      "type": "endpoint",
+      "name": "POST /sessions",
+      "filePath": "app/api/routes.py",
+      "lineRange": [313, 323],
+      "summary": "Creates a new chat session and returns its thread_id (tenant-scoped).",
+      "tags": ["endpoint", "session", "create"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:GET-/sessions/{thread_id}",
+      "type": "endpoint",
+      "name": "GET /sessions/{thread_id}",
+      "filePath": "app/api/routes.py",
+      "lineRange": [327, 336],
+      "summary": "Fetches a single session; tenant + owner-checked.",
+      "tags": ["endpoint", "session", "read"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:PATCH-/sessions/{thread_id}",
+      "type": "endpoint",
+      "name": "PATCH /sessions/{thread_id}",
+      "filePath": "app/api/routes.py",
+      "lineRange": [340, 353],
+      "summary": "Renames a session; tenant + owner-checked.",
+      "tags": ["endpoint", "session", "update"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:DELETE-/sessions/{thread_id}",
+      "type": "endpoint",
+      "name": "DELETE /sessions/{thread_id}",
+      "filePath": "app/api/routes.py",
+      "lineRange": [357, 366],
+      "summary": "Deletes a session and cleans up associated state; tenant + owner-checked.",
+      "tags": ["endpoint", "session", "delete"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:POST-/evolution/reflect",
+      "type": "endpoint",
+      "name": "POST /evolution/reflect",
+      "filePath": "app/api/routes.py",
+      "lineRange": [377, 393],
+      "summary": "Admin-only: triggers the Hermes self-reflection loop to evaluate and optionally auto-adopt a new global system prompt.",
+      "tags": ["endpoint", "evolution", "admin", "prompt-engineering"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:GET-/evolution/prompt",
+      "type": "endpoint",
+      "name": "GET /evolution/prompt",
+      "filePath": "app/api/routes.py",
+      "lineRange": [397, 404],
+      "summary": "Admin-only: returns the currently active system prompt and its version.",
+      "tags": ["endpoint", "evolution", "admin"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:GET-/evolution/versions",
+      "type": "endpoint",
+      "name": "GET /evolution/versions",
+      "filePath": "app/api/routes.py",
+      "lineRange": [408, 415],
+      "summary": "Admin-only: lists historical system-prompt versions.",
+      "tags": ["endpoint", "evolution", "admin", "versioning"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:POST-/evolution/rollback/{version}",
+      "type": "endpoint",
+      "name": "POST /evolution/rollback/{version}",
+      "filePath": "app/api/routes.py",
+      "lineRange": [419, 424],
+      "summary": "Admin-only: rolls back the active system prompt to a specified historical version.",
+      "tags": ["endpoint", "evolution", "admin", "rollback"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:GET-/stats/usage",
+      "type": "endpoint",
+      "name": "GET /stats/usage",
+      "filePath": "app/api/routes.py",
+      "lineRange": [431, 447],
+      "summary": "Token usage and cost statistics; non-admins are locked to their own data while admins see tenant-wide totals.",
+      "tags": ["endpoint", "stats", "usage", "admin"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "endpoint:app/api/routes.py:GET-/metrics",
+      "type": "endpoint",
+      "name": "GET /metrics",
+      "filePath": "app/api/routes.py",
+      "lineRange": [451, 455],
+      "summary": "Admin-only: runtime metrics (request counts, latency, infrastructure status).",
+      "tags": ["endpoint", "metrics", "admin", "observability"],
+      "complexity": "simple"
+    },
+
+    {
+      "id": "endpoint:app/auth/routes.py:POST-/auth/register",
+      "type": "endpoint",
+      "name": "POST /auth/register",
+      "filePath": "app/auth/routes.py",
+      "lineRange": [48, 59],
+      "summary": "Registers a new user and returns a JWT immediately (skipping a second login step); tenant resolved server-side.",
+      "tags": ["endpoint", "auth", "register", "jwt"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/auth/routes.py:POST-/auth/login",
+      "type": "endpoint",
+      "name": "POST /auth/login",
+      "filePath": "app/auth/routes.py",
+      "lineRange": [63, 72],
+      "summary": "Authenticates username/password credentials and returns a JWT.",
+      "tags": ["endpoint", "auth", "login", "jwt"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:app/auth/routes.py:GET-/auth/me",
+      "type": "endpoint",
+      "name": "GET /auth/me",
+      "filePath": "app/auth/routes.py",
+      "lineRange": [76, 84],
+      "summary": "Returns the currently authenticated user's identity, tenant, and role.",
+      "tags": ["endpoint", "auth", "identity"],
+      "complexity": "simple"
+    },
+
+    {
+      "id": "class:app/api/schemas.py:ChatRequest",
+      "type": "class",
+      "name": "ChatRequest",
+      "filePath": "app/api/schemas.py",
+      "lineRange": [12, 18],
+      "summary": "Request body for chat endpoints carrying the message, thread_id, optional user_id, and knowledge-base ids.",
+      "tags": ["data-model", "pydantic", "chat", "request"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/api/schemas.py:ChatResponse",
+      "type": "class",
+      "name": "ChatResponse",
+      "filePath": "app/api/schemas.py",
+      "lineRange": [21, 26],
+      "summary": "Response model for blocking chat containing the reply text, thread_id, and LLM provider name.",
+      "tags": ["data-model", "pydantic", "chat", "response"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/api/schemas.py:HealthResponse",
+      "type": "class",
+      "name": "HealthResponse",
+      "filePath": "app/api/schemas.py",
+      "lineRange": [29, 35],
+      "summary": "Response model for the health endpoint with app name, version, and default provider.",
+      "tags": ["data-model", "pydantic", "health", "response"],
+      "complexity": "simple"
+    },
+
+    {
+      "id": "class:app/auth/dependencies.py:CurrentUser",
+      "type": "class",
+      "name": "CurrentUser",
+      "filePath": "app/auth/dependencies.py",
+      "lineRange": [27, 38],
+      "summary": "Dataclass representing the authenticated requester: user_id, tenant_id, username, role, and is_authenticated flag, with an is_admin property.",
+      "tags": ["data-model", "identity", "authentication", "principal"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/auth/dependencies.py:get_current_user",
+      "type": "function",
+      "name": "get_current_user",
+      "filePath": "app/auth/dependencies.py",
+      "lineRange": [55, 68],
+      "summary": "FastAPI dependency that extracts the JWT from the Authorization header, decodes it, and returns the CurrentUser (or the dev-mode anonymous user when auth is disabled).",
+      "tags": ["authentication", "fastapi-depends", "jwt", "middleware"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/auth/dependencies.py:require_admin",
+      "type": "function",
+      "name": "require_admin",
+      "filePath": "app/auth/dependencies.py",
+      "lineRange": [71, 85],
+      "summary": "FastAPI dependency that raises ForbiddenError unless the caller has the admin role (bypassed in dev mode).",
+      "tags": ["authorization", "fastapi-depends", "admin", "rbac"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/auth/dependencies.py:get_optional_user",
+      "type": "function",
+      "name": "get_optional_user",
+      "filePath": "app/auth/dependencies.py",
+      "lineRange": [88, 106],
+      "summary": "FastAPI dependency returning an authenticated CurrentUser when a valid token is present, or an anonymous user otherwise.",
+      "tags": ["authentication", "fastapi-depends", "optional-auth"],
+      "complexity": "moderate"
+    },
+
+    {
+      "id": "function:app/auth/jwt_service.py:create_token",
+      "type": "function",
+      "name": "create_token",
+      "filePath": "app/auth/jwt_service.py",
+      "lineRange": [62, 78],
+      "summary": "Builds and signs a JWT containing user_id, tenant_id, username, role, and a random jti, using the configured secret and expiry.",
+      "tags": ["authentication", "jwt", "token", "security"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/auth/jwt_service.py:decode_token",
+      "type": "function",
+      "name": "decode_token",
+      "filePath": "app/auth/jwt_service.py",
+      "lineRange": [81, 93],
+      "summary": "Verifies and decodes a JWT against the configured secret/algorithm, returning the payload or raising AuthError on invalid or expired tokens.",
+      "tags": ["authentication", "jwt", "verification", "security"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/auth/jwt_service.py:extract_token_from_header",
+      "type": "function",
+      "name": "extract_token_from_header",
+      "filePath": "app/auth/jwt_service.py",
+      "lineRange": [96, 103],
+      "summary": "Parses an Authorization header value and returns the raw Bearer token, validating the scheme.",
+      "tags": ["authentication", "jwt", "header-parsing"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/auth/jwt_service.py:hash_password",
+      "type": "function",
+      "name": "hash_password",
+      "filePath": "app/auth/jwt_service.py",
+      "lineRange": [38, 41],
+      "summary": "Hashes a plaintext password with bcrypt and a freshly generated salt.",
+      "tags": ["authentication", "bcrypt", "password", "hashing"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/auth/jwt_service.py:verify_password",
+      "type": "function",
+      "name": "verify_password",
+      "filePath": "app/auth/jwt_service.py",
+      "lineRange": [44, 50],
+      "summary": "Checks a plaintext password against a stored bcrypt hash in constant time.",
+      "tags": ["authentication", "bcrypt", "password", "verification"],
+      "complexity": "simple"
+    },
+
+    {
+      "id": "function:app/auth/tenant.py:resolve_tenant",
+      "type": "function",
+      "name": "resolve_tenant",
+      "filePath": "app/auth/tenant.py",
+      "lineRange": [30, 51],
+      "summary": "Determines the tenant_id from the request tenant header, enforcing the allowed-tenant whitelist and falling back to the default tenant.",
+      "tags": ["multi-tenant", "isolation", "resolution", "security"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/auth/tenant.py:scoped_user_id",
+      "type": "function",
+      "name": "scoped_user_id",
+      "filePath": "app/auth/tenant.py",
+      "lineRange": [67, 76],
+      "summary": "Computes a tenant-namespaced user identifier so per-user data cannot collide across tenants.",
+      "tags": ["multi-tenant", "isolation", "namespace", "user"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/auth/tenant.py:scoped_thread_id",
+      "type": "function",
+      "name": "scoped_thread_id",
+      "filePath": "app/auth/tenant.py",
+      "lineRange": [79, 85],
+      "summary": "Computes a tenant-namespaced thread identifier for session and checkpointer isolation.",
+      "tags": ["multi-tenant", "isolation", "namespace", "session"],
+      "complexity": "simple"
+    },
+
+    {
+      "id": "class:app/auth/user_service.py:UserService",
+      "type": "class",
+      "name": "UserService",
+      "filePath": "app/auth/user_service.py",
+      "lineRange": [24, 99],
+      "summary": "Database-backed service exposing register, authenticate, and get_by_id operations against the connection pool, with row serialization.",
+      "tags": ["service", "user-management", "database", "authentication"],
+      "complexity": "moderate",
+      "languageNotes": "Uses asyncpg-style pool.acquire() context and fetchrow; passwords stored as bcrypt hashes."
+    }
+  ],
+  "edges": [
+    {"source": "file:app/api/routes.py", "target": "file:app/__init__.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/api/routes.py", "target": "file:app/agent/graph.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/api/routes.py", "target": "file:app/api/schemas.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/api/routes.py", "target": "file:app/auth/dependencies.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/api/routes.py", "target": "file:app/core/config.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/api/routes.py", "target": "file:app/core/exceptions.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/api/routes.py", "target": "file:app/core/logging.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/api/routes.py", "target": "file:app/llm/factory.py", "type": "imports", "direction": "forward", "weight": 0.7},
+
+    {"source": "file:app/auth/dependencies.py", "target": "file:app/auth/jwt_service.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/auth/dependencies.py", "target": "file:app/core/config.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/auth/dependencies.py", "target": "file:app/core/exceptions.py", "type": "imports", "direction": "forward", "weight": 0.7},
+
+    {"source": "file:app/auth/jwt_service.py", "target": "file:app/core/config.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/auth/jwt_service.py", "target": "file:app/core/exceptions.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/auth/jwt_service.py", "target": "file:app/core/logging.py", "type": "imports", "direction": "forward", "weight": 0.7},
+
+    {"source": "file:app/auth/routes.py", "target": "file:app/auth/dependencies.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/auth/routes.py", "target": "file:app/auth/jwt_service.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/auth/routes.py", "target": "file:app/auth/tenant.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/auth/routes.py", "target": "file:app/auth/user_service.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/auth/routes.py", "target": "file:app/core/logging.py", "type": "imports", "direction": "forward", "weight": 0.7},
+
+    {"source": "file:app/auth/user_service.py", "target": "file:app/auth/jwt_service.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/auth/user_service.py", "target": "file:app/core/logging.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/auth/user_service.py", "target": "file:app/db/manager.py", "type": "imports", "direction": "forward", "weight": 0.7},
+
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:GET-/health", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:GET-/tools", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:GET-/skills", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:POST-/chat", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:POST-/chat/stream", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:POST-/chat/http-stream", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:POST-/memory", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:GET-/memory/{user_id}", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:GET-/memory/{user_id}/all", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:DELETE-/memory/{user_id}/{key}", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:POST-/profile/interest", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:POST-/profile/preference", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:GET-/profile/{user_id}", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:GET-/history/{thread_id}", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:POST-/chat/cancel/{thread_id}", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:GET-/sessions", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:POST-/sessions", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:GET-/sessions/{thread_id}", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:PATCH-/sessions/{thread_id}", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:DELETE-/sessions/{thread_id}", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:POST-/evolution/reflect", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:GET-/evolution/prompt", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:GET-/evolution/versions", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:POST-/evolution/rollback/{version}", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:GET-/stats/usage", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/routes.py", "target": "endpoint:app/api/routes.py:GET-/metrics", "type": "contains", "direction": "forward", "weight": 1.0},
+
+    {"source": "file:app/auth/routes.py", "target": "endpoint:app/auth/routes.py:POST-/auth/register", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/auth/routes.py", "target": "endpoint:app/auth/routes.py:POST-/auth/login", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/auth/routes.py", "target": "endpoint:app/auth/routes.py:GET-/auth/me", "type": "contains", "direction": "forward", "weight": 1.0},
+
+    {"source": "file:app/api/schemas.py", "target": "class:app/api/schemas.py:ChatRequest", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/schemas.py", "target": "class:app/api/schemas.py:ChatResponse", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/api/schemas.py", "target": "class:app/api/schemas.py:HealthResponse", "type": "contains", "direction": "forward", "weight": 1.0},
+
+    {"source": "file:app/auth/dependencies.py", "target": "class:app/auth/dependencies.py:CurrentUser", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/auth/dependencies.py", "target": "function:app/auth/dependencies.py:get_current_user", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/auth/dependencies.py", "target": "function:app/auth/dependencies.py:require_admin", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/auth/dependencies.py", "target": "function:app/auth/dependencies.py:get_optional_user", "type": "contains", "direction": "forward", "weight": 1.0},
+
+    {"source": "file:app/auth/jwt_service.py", "target": "function:app/auth/jwt_service.py:create_token", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/auth/jwt_service.py", "target": "function:app/auth/jwt_service.py:decode_token", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/auth/jwt_service.py", "target": "function:app/auth/jwt_service.py:extract_token_from_header", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/auth/jwt_service.py", "target": "function:app/auth/jwt_service.py:hash_password", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/auth/jwt_service.py", "target": "function:app/auth/jwt_service.py:verify_password", "type": "contains", "direction": "forward", "weight": 1.0},
+
+    {"source": "file:app/auth/tenant.py", "target": "function:app/auth/tenant.py:resolve_tenant", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/auth/tenant.py", "target": "function:app/auth/tenant.py:scoped_user_id", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/auth/tenant.py", "target": "function:app/auth/tenant.py:scoped_thread_id", "type": "contains", "direction": "forward", "weight": 1.0},
+
+    {"source": "file:app/auth/user_service.py", "target": "class:app/auth/user_service.py:UserService", "type": "contains", "direction": "forward", "weight": 1.0},
+
+    {"source": "file:app/api/schemas.py", "target": "class:app/api/schemas.py:ChatRequest", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/api/schemas.py", "target": "class:app/api/schemas.py:ChatResponse", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/api/schemas.py", "target": "class:app/api/schemas.py:HealthResponse", "type": "exports", "direction": "forward", "weight": 0.8},
+
+    {"source": "file:app/auth/dependencies.py", "target": "class:app/auth/dependencies.py:CurrentUser", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/auth/dependencies.py", "target": "function:app/auth/dependencies.py:get_current_user", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/auth/dependencies.py", "target": "function:app/auth/dependencies.py:require_admin", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/auth/dependencies.py", "target": "function:app/auth/dependencies.py:get_optional_user", "type": "exports", "direction": "forward", "weight": 0.8},
+
+    {"source": "file:app/auth/jwt_service.py", "target": "function:app/auth/jwt_service.py:create_token", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/auth/jwt_service.py", "target": "function:app/auth/jwt_service.py:decode_token", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/auth/jwt_service.py", "target": "function:app/auth/jwt_service.py:extract_token_from_header", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/auth/jwt_service.py", "target": "function:app/auth/jwt_service.py:hash_password", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/auth/jwt_service.py", "target": "function:app/auth/jwt_service.py:verify_password", "type": "exports", "direction": "forward", "weight": 0.8},
+
+    {"source": "file:app/auth/tenant.py", "target": "function:app/auth/tenant.py:resolve_tenant", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/auth/tenant.py", "target": "function:app/auth/tenant.py:scoped_user_id", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/auth/tenant.py", "target": "function:app/auth/tenant.py:scoped_thread_id", "type": "exports", "direction": "forward", "weight": 0.8},
+
+    {"source": "file:app/auth/user_service.py", "target": "class:app/auth/user_service.py:UserService", "type": "exports", "direction": "forward", "weight": 0.8},
+
+    {"source": "endpoint:app/api/routes.py:POST-/chat", "target": "function:app/agent/graph.py:run_agent", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "endpoint:app/api/routes.py:POST-/chat/stream", "target": "function:app/agent/graph.py:stream_agent", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "endpoint:app/api/routes.py:POST-/chat/http-stream", "target": "function:app/agent/graph.py:stream_agent", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "endpoint:app/api/routes.py:POST-/chat", "target": "function:app/llm/factory.py:get_llm_client", "type": "calls", "direction": "forward", "weight": 0.8},
+
+    {"source": "function:app/auth/dependencies.py:get_current_user", "target": "function:app/auth/jwt_service.py:decode_token", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "function:app/auth/dependencies.py:get_current_user", "target": "function:app/auth/jwt_service.py:extract_token_from_header", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "function:app/auth/dependencies.py:require_admin", "target": "class:app/core/exceptions.py:ForbiddenError", "type": "calls", "direction": "forward", "weight": 0.8},
+
+    {"source": "function:app/auth/jwt_service.py:create_token", "target": "function:app/core/config.py:get_settings", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "function:app/auth/jwt_service.py:decode_token", "target": "function:app/core/config.py:get_settings", "type": "calls", "direction": "forward", "weight": 0.8},
+
+    {"source": "endpoint:app/auth/routes.py:POST-/auth/register", "target": "function:app/auth/jwt_service.py:create_token", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "endpoint:app/auth/routes.py:POST-/auth/login", "target": "function:app/auth/jwt_service.py:create_token", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "endpoint:app/auth/routes.py:POST-/auth/register", "target": "function:app/auth/tenant.py:resolve_tenant", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "endpoint:app/auth/routes.py:POST-/auth/login", "target": "function:app/auth/tenant.py:resolve_tenant", "type": "calls", "direction": "forward", "weight": 0.8},
+
+    {"source": "class:app/auth/user_service.py:UserService", "target": "function:app/auth/jwt_service.py:hash_password", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "class:app/auth/user_service.py:UserService", "target": "function:app/auth/jwt_service.py:verify_password", "type": "calls", "direction": "forward", "weight": 0.8}
+  ]
+}

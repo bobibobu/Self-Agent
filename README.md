@@ -168,6 +168,7 @@ curl -X POST http://localhost:8000/chat/http-stream ... # NDJSON 流式
 
 - **[从零读懂 Self-Agent](docs/00-overview/02-从零读懂.md)** ← 零基础从这里开始
 - **[项目总览：功能点 · 使用说明 · 项目结构](docs/00-overview/README.md)** ← 参考手册
+- **[📘 Agent 开发学习书架](docs/06-agent-book/README.md)** ← 系统学习 Agent 开发（基础全书 + 4 本开源项目拆解，含状态/记忆/安全/协议全领域，附「状态的真相」「外部世界怎么做」等深度章节）
 - [架构总览](docs/01-architecture/README.md)
 - [环境搭建指南](docs/03-development/01-setup.md)
 - [LLM 多协议设计](docs/02-modules/01-llm-layer.md)

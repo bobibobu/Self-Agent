@@ -1,0 +1,692 @@
+{
+  "nodes": [
+    {
+      "id": "file:app/agent/context_manager.py",
+      "type": "file",
+      "name": "context_manager.py",
+      "filePath": "app/agent/context_manager.py",
+      "summary": "Compresses long conversation histories by summarizing older messages via the LLM so the agent stays within token/context limits while keeping the most recent turns intact.",
+      "tags": ["context-management", "summarization", "agent", "utility"],
+      "complexity": "moderate",
+      "languageNotes": "Uses LangChain SystemMessage and the project LLM client to produce a summary replacement for stale message windows."
+    },
+    {
+      "id": "function:app/agent/context_manager.py:compress_if_needed",
+      "type": "function",
+      "name": "compress_if_needed",
+      "filePath": "app/agent/context_manager.py",
+      "lineRange": [43, 84],
+      "summary": "Checks the message count against a threshold and, when exceeded, slices off the older messages, summarizes them, and swaps in a single SystemMessage summary while preserving the recent tail.",
+      "tags": ["context-compression", "summarization", "threshold", "utility"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/agent/context_manager.py:_generate_summary",
+      "type": "function",
+      "name": "_generate_summary",
+      "filePath": "app/agent/context_manager.py",
+      "lineRange": [87, 111],
+      "summary": "Private helper that flattens messages into a dialog transcript and asks the LLM (via ChatRequest) to produce a concise summary string.",
+      "tags": ["summarization", "llm", "utility"],
+      "complexity": "simple"
+    },
+
+    {
+      "id": "file:app/core/exceptions.py",
+      "type": "file",
+      "name": "exceptions.py",
+      "filePath": "app/core/exceptions.py",
+      "summary": "Defines the project-wide AppError exception hierarchy and registers FastAPI global exception handlers that convert application and unexpected errors into a uniform JSON error envelope (hiding details in production).",
+      "tags": ["error-handling", "exceptions", "fastapi", "middleware"],
+      "complexity": "moderate",
+      "languageNotes": "Base class carries code/status_code/details; subclasses pin specific HTTP status codes (502 for LLM, 403 for forbidden, 404 for not-found)."
+    },
+    {
+      "id": "class:app/core/exceptions.py:AppError",
+      "type": "class",
+      "name": "AppError",
+      "filePath": "app/core/exceptions.py",
+      "lineRange": [16, 24],
+      "summary": "Root exception for all application business errors, carrying a message, error code, HTTP status code, and optional details payload.",
+      "tags": ["exception", "base-class", "error-handling"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/core/exceptions.py:ConfigError",
+      "type": "class",
+      "name": "ConfigError",
+      "filePath": "app/core/exceptions.py",
+      "lineRange": [27, 29],
+      "summary": "Raised on missing or invalid configuration (e.g. an unconfigured API key); maps to HTTP 500 with code CONFIG_ERROR.",
+      "tags": ["exception", "configuration", "error-handling"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/core/exceptions.py:LLMError",
+      "type": "class",
+      "name": "LLMError",
+      "filePath": "app/core/exceptions.py",
+      "lineRange": [32, 37],
+      "summary": "Wraps failures from any LLM provider call, optionally tagging the offending provider; maps to HTTP 502.",
+      "tags": ["exception", "llm", "error-handling"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/core/exceptions.py:AgentError",
+      "type": "class",
+      "name": "AgentError",
+      "filePath": "app/core/exceptions.py",
+      "lineRange": [40, 44],
+      "summary": "Signals a failure during agent execution; maps to HTTP 500 with code AGENT_ERROR.",
+      "tags": ["exception", "agent", "error-handling"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/core/exceptions.py:ForbiddenError",
+      "type": "class",
+      "name": "ForbiddenError",
+      "filePath": "app/core/exceptions.py",
+      "lineRange": [47, 51],
+      "summary": "Indicates an authenticated user lacks permission (HTTP 403), distinct from unauthenticated 401.",
+      "tags": ["exception", "authorization", "error-handling"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/core/exceptions.py:NotFoundError",
+      "type": "class",
+      "name": "NotFoundError",
+      "filePath": "app/core/exceptions.py",
+      "lineRange": [54, 61],
+      "summary": "Returned for missing resources (HTTP 404); deliberately used for ownership failures too, to avoid leaking the existence of a resource.",
+      "tags": ["exception", "not-found", "security", "error-handling"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/core/exceptions.py:register_exception_handlers",
+      "type": "function",
+      "name": "register_exception_handlers",
+      "filePath": "app/core/exceptions.py",
+      "lineRange": [64, 91],
+      "summary": "Installs FastAPI exception handlers for AppError (structured JSON) and the catch-all Exception handler that logs the stack and returns a dev-or-prod message.",
+      "tags": ["error-handling", "fastapi", "middleware", "registration"],
+      "complexity": "moderate"
+    },
+
+    {
+      "id": "file:app/evolution/memory_learner.py",
+      "type": "file",
+      "name": "memory_learner.py",
+      "filePath": "app/evolution/memory_learner.py",
+      "summary": "Part of the Hermes self-improvement loop: after each conversation it asks the LLM to extract the user's interests, preferences, and facts, then persists them via the profile and memory services.",
+      "tags": ["evolution", "memory", "learning", "hermes"],
+      "complexity": "moderate",
+      "languageNotes": "Async functions; uses tenant-scoped user ids (scoped_user_id) for multi-tenant memory namespacing."
+    },
+    {
+      "id": "function:app/evolution/memory_learner.py:learn_from_conversation",
+      "type": "function",
+      "name": "learn_from_conversation",
+      "filePath": "app/evolution/memory_learner.py",
+      "lineRange": [36, 74],
+      "summary": "Sends the user message and agent reply to the LLM with an extraction prompt, parses out structured memories, and forwards them to _save_learned when content is present.",
+      "tags": ["learning", "llm", "evolution", "extraction"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/evolution/memory_learner.py:_parse_extraction",
+      "type": "function",
+      "name": "_parse_extraction",
+      "filePath": "app/evolution/memory_learner.py",
+      "lineRange": [77, 93],
+      "summary": "Private helper that strips markdown code fences from LLM output and parses the remainder as JSON to recover interests/preferences/facts fields.",
+      "tags": ["parsing", "json", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/evolution/memory_learner.py:_save_learned",
+      "type": "function",
+      "name": "_save_learned",
+      "filePath": "app/evolution/memory_learner.py",
+      "lineRange": [100, 134],
+      "summary": "Persists extracted memories: adds interests and preferences through the profile service and stores facts via the memory service, all under the tenant-scoped user id.",
+      "tags": ["memory", "profile", "persistence", "tenant"],
+      "complexity": "moderate"
+    },
+
+    {
+      "id": "file:app/evolution/prompt_store.py",
+      "type": "file",
+      "name": "prompt_store.py",
+      "filePath": "app/evolution/prompt_store.py",
+      "summary": "File-backed versioned store for the agent's system prompt: tracks a current version and a full history of prompt versions with metadata (source, score, note), supporting save, list, and rollback.",
+      "tags": ["evolution", "prompt", "versioning", "persistence"],
+      "complexity": "moderate",
+      "languageNotes": "Persists versions as JSON files under a prompts directory on disk; current pointer is a small JSON file rewritten on each save/rollback."
+    },
+    {
+      "id": "function:app/evolution/prompt_store.py:get_current_prompt",
+      "type": "function",
+      "name": "get_current_prompt",
+      "filePath": "app/evolution/prompt_store.py",
+      "lineRange": [34, 48],
+      "summary": "Returns the currently active system prompt text, or the default when no current pointer exists.",
+      "tags": ["prompt", "read", "versioning"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/evolution/prompt_store.py:get_current_version",
+      "type": "function",
+      "name": "get_current_version",
+      "filePath": "app/evolution/prompt_store.py",
+      "lineRange": [51, 60],
+      "summary": "Returns the version identifier of the current system prompt.",
+      "tags": ["prompt", "read", "versioning"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/evolution/prompt_store.py:save_version",
+      "type": "function",
+      "name": "save_version",
+      "filePath": "app/evolution/prompt_store.py",
+      "lineRange": [63, 85],
+      "summary": "Writes a new prompt version to disk with its source, score, and note metadata, advances the current pointer to it, and appends to the version history file.",
+      "tags": ["prompt", "write", "versioning", "persistence"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/evolution/prompt_store.py:list_versions",
+      "type": "function",
+      "name": "list_versions",
+      "filePath": "app/evolution/prompt_store.py",
+      "lineRange": [88, 105],
+      "summary": "Reads all on-disk version files and returns them sorted by timestamp, capped to a limit.",
+      "tags": ["prompt", "list", "versioning"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/evolution/prompt_store.py:rollback",
+      "type": "function",
+      "name": "rollback",
+      "filePath": "app/evolution/prompt_store.py",
+      "lineRange": [108, 118],
+      "summary": "Repoints the current prompt at a previously saved version by its version id.",
+      "tags": ["prompt", "rollback", "versioning"],
+      "complexity": "simple"
+    },
+
+    {
+      "id": "file:app/evolution/reflector.py",
+      "type": "file",
+      "name": "reflector.py",
+      "filePath": "app/evolution/reflector.py",
+      "summary": "The Hermes reflection step: pulls recent successful conversation samples, asks the LLM to critique and refine the current system prompt, scores the result, and auto-applies the new version when the score clears a configurable threshold.",
+      "tags": ["evolution", "reflection", "hermes", "self-improvement"],
+      "complexity": "moderate",
+      "languageNotes": "Fetches samples from MongoDB (conversation_events collection) and writes improved prompts through prompt_store.save_version."
+    },
+    {
+      "id": "function:app/evolution/reflector.py:reflect",
+      "type": "function",
+      "name": "reflect",
+      "filePath": "app/evolution/reflector.py",
+      "lineRange": [46, 123],
+      "summary": "Orchestrates a reflection cycle: load current prompt, gather recent samples, prompt the LLM for an improved prompt + self-score, and save_version when the score exceeds auto_apply_threshold.",
+      "tags": ["reflection", "llm", "self-improvement", "orchestration"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:app/evolution/reflector.py:_fetch_recent_samples",
+      "type": "function",
+      "name": "_fetch_recent_samples",
+      "filePath": "app/evolution/reflector.py",
+      "lineRange": [126, 143],
+      "summary": "Queries MongoDB for the most recent successful conversation events (those with an agent reply and no error) up to the given limit.",
+      "tags": ["database", "mongo", "query"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/evolution/reflector.py:_parse_reflection",
+      "type": "function",
+      "name": "_parse_reflection",
+      "filePath": "app/evolution/reflector.py",
+      "lineRange": [146, 161],
+      "summary": "Strips markdown fences from the LLM reflection output and parses it as JSON to recover the candidate prompt, score, and rationale.",
+      "tags": ["parsing", "json", "utility"],
+      "complexity": "simple"
+    },
+
+    {
+      "id": "file:app/llm/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "app/llm/__init__.py",
+      "summary": "Package barrel for the multi-protocol LLM abstraction layer: re-exports the LLMClient protocol, the get_llm_client factory, and the provider-agnostic data models so callers depend only on app.llm.",
+      "tags": ["barrel", "entry-point", "llm", "exports"],
+      "complexity": "simple",
+      "languageNotes": "Python package __init__ aggregating the public surface of the llm subpackage."
+    },
+
+    {
+      "id": "file:app/llm/base.py",
+      "type": "file",
+      "name": "base.py",
+      "filePath": "app/llm/base.py",
+      "summary": "Defines LLMClient, the runtime-checkable Protocol every provider implements, exposing provider_name/default_model properties plus chat() and stream_chat() methods that all of GLM/OpenAI/Anthropic conform to.",
+      "tags": ["protocol", "interface", "llm", "type-definition"],
+      "complexity": "simple",
+      "languageNotes": "Uses typing.Protocol with @runtime_checkable; stream_chat is intentionally a non-async function returning an async iterator (ChatStream) to match async-generator providers."
+    },
+    {
+      "id": "class:app/llm/base.py:LLMClient",
+      "type": "class",
+      "name": "LLMClient",
+      "filePath": "app/llm/base.py",
+      "lineRange": [16, 46],
+      "summary": "Structural protocol contract for LLM providers: identifies the provider, exposes a default model name, and offers one-shot chat plus streaming chat methods.",
+      "tags": ["protocol", "interface", "llm"],
+      "complexity": "simple"
+    },
+
+    {
+      "id": "file:app/llm/factory.py",
+      "type": "file",
+      "name": "factory.py",
+      "filePath": "app/llm/factory.py",
+      "summary": "Factory that builds the configured LLMClient implementation (GLM and OpenAI share OpenAILikeClient via OpenAI-compatible endpoints; Anthropic uses AnthropicClient), with an lru-cached singleton accessor for runtime provider switching.",
+      "tags": ["factory", "llm", "provider", "routing"],
+      "complexity": "moderate",
+      "languageNotes": "GLM reuses OpenAILikeClient with a custom base_url; get_llm_client is @lru_cache'd for singleton reuse."
+    },
+    {
+      "id": "function:app/llm/factory.py:create_llm_client",
+      "type": "function",
+      "name": "create_llm_client",
+      "filePath": "app/llm/factory.py",
+      "lineRange": [26, 64],
+      "summary": "Constructs a fresh LLMClient for the requested provider, reading keys/URLs/models from settings and raising ConfigError when required credentials are missing.",
+      "tags": ["factory", "provider", "llm"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/llm/factory.py:get_llm_client",
+      "type": "function",
+      "name": "get_llm_client",
+      "filePath": "app/llm/factory.py",
+      "lineRange": [68, 75],
+      "summary": "Returns the cached singleton LLMClient, defaulting to the configured provider when none is specified.",
+      "tags": ["factory", "singleton", "llm", "caching"],
+      "complexity": "simple"
+    },
+
+    {
+      "id": "file:app/llm/models.py",
+      "type": "file",
+      "name": "models.py",
+      "filePath": "app/llm/models.py",
+      "summary": "Provider-agnostic Pydantic data models for the LLM layer: messages, tool calls, tool definitions, token usage, and the unified request/response/stream-chunk types that every provider converts to and from.",
+      "tags": ["data-model", "llm", "pydantic", "type-definition"],
+      "complexity": "moderate",
+      "languageNotes": "Pydantic BaseModel throughout; StreamChunk aggregates cross-chunk tool-call deltas so the final chunk carries the complete tool_calls."
+    },
+    {
+      "id": "class:app/llm/models.py:ToolCall",
+      "type": "class",
+      "name": "ToolCall",
+      "filePath": "app/llm/models.py",
+      "lineRange": [18, 23],
+      "summary": "Represents a single tool invocation requested by the model: an id, name, and parsed arguments dict used to correlate the tool result back to the model.",
+      "tags": ["data-model", "tool-call", "pydantic"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/llm/models.py:ChatMessage",
+      "type": "class",
+      "name": "ChatMessage",
+      "filePath": "app/llm/models.py",
+      "lineRange": [26, 35],
+      "summary": "Unified chat message with a role (system/user/assistant/tool), content, optional assistant tool_calls, and tool result correlation fields.",
+      "tags": ["data-model", "message", "pydantic"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/llm/models.py:ToolDefinition",
+      "type": "class",
+      "name": "ToolDefinition",
+      "filePath": "app/llm/models.py",
+      "lineRange": [41, 46],
+      "summary": "Schema of a tool exposed to the model in the OpenAI function-calling format: name, description, and a JSON-Schema parameters object.",
+      "tags": ["data-model", "tool-definition", "pydantic"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/llm/models.py:Usage",
+      "type": "class",
+      "name": "Usage",
+      "filePath": "app/llm/models.py",
+      "lineRange": [52, 57],
+      "summary": "Token usage counters (prompt, completion, total) returned with each response for cost and quota tracking.",
+      "tags": ["data-model", "usage", "pydantic"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/llm/models.py:ChatRequest",
+      "type": "class",
+      "name": "ChatRequest",
+      "filePath": "app/llm/models.py",
+      "lineRange": [60, 68],
+      "summary": "Unified non-streaming chat request: messages, optional model override, sampling parameters, and optional tool definitions with a tool_choice directive.",
+      "tags": ["data-model", "request", "pydantic"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/llm/models.py:ChatResponse",
+      "type": "class",
+      "name": "ChatResponse",
+      "filePath": "app/llm/models.py",
+      "lineRange": [71, 79],
+      "summary": "Complete non-streaming LLM response: text content, tool calls, usage, model name, finish reason, and the raw provider payload for debugging.",
+      "tags": ["data-model", "response", "pydantic"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/llm/models.py:StreamChunk",
+      "type": "class",
+      "name": "StreamChunk",
+      "filePath": "app/llm/models.py",
+      "lineRange": [85, 98],
+      "summary": "Single chunk of a streamed response; the terminal chunk carries the fully aggregated tool calls and final usage/model so callers get text and tool decisions in one pass.",
+      "tags": ["data-model", "streaming", "pydantic"],
+      "complexity": "simple"
+    },
+
+    {
+      "id": "file:app/llm/providers/anthropic.py",
+      "type": "file",
+      "name": "anthropic.py",
+      "filePath": "app/llm/providers/anthropic.py",
+      "summary": "Anthropic LLMClient implementation: adapts the unified ChatRequest/Response models to the Anthropic Messages API, including system-message splitting, tool translation, response parsing, and streaming via the Anthropic SDK.",
+      "tags": ["llm", "provider", "anthropic", "adapter"],
+      "complexity": "complex",
+      "languageNotes": "Uses AsyncAnthropic; converts ChatMessage list into Anthropic's messages+system split and parses ToolUse/Text content blocks back into ChatResponse."
+    },
+    {
+      "id": "class:app/llm/providers/anthropic.py:AnthropicClient",
+      "type": "class",
+      "name": "AnthropicClient",
+      "filePath": "app/llm/providers/anthropic.py",
+      "lineRange": [33, 199],
+      "summary": "LLMClient implementation for Anthropic Claude: builds the SDK client, normalizes messages/tools to Anthropic format, and implements chat() and stream_chat() returning the unified response models.",
+      "tags": ["llm", "provider", "anthropic", "adapter"],
+      "complexity": "complex"
+    },
+
+    {
+      "id": "file:app/llm/providers/openai_like.py",
+      "type": "file",
+      "name": "openai_like.py",
+      "filePath": "app/llm/providers/openai_like.py",
+      "summary": "OpenAI-compatible LLMClient implementation shared by OpenAI and GLM (zhipu): translates the unified models to/from the OpenAI chat.completions API, with cross-chunk tool-call aggregation for streaming.",
+      "tags": ["llm", "provider", "openai", "glm", "adapter"],
+      "complexity": "complex",
+      "languageNotes": "Uses AsyncOpenAI with a configurable base_url so GLM's OpenAI-compatible endpoint works with zero custom logic; stream_chat accumulates tool_call deltas by index before emitting the final chunk."
+    },
+    {
+      "id": "class:app/llm/providers/openai_like.py:OpenAILikeClient",
+      "type": "class",
+      "name": "OpenAILikeClient",
+      "filePath": "app/llm/providers/openai_like.py",
+      "lineRange": [37, 260],
+      "summary": "LLMClient implementation for OpenAI and GLM: constructs the AsyncOpenAI client, converts unified messages/tools to OpenAI format, parses responses, and streams chunks with aggregated tool calls.",
+      "tags": ["llm", "provider", "openai", "adapter"],
+      "complexity": "complex"
+    },
+
+    {
+      "id": "file:scripts/verify_agent.py",
+      "type": "file",
+      "name": "verify_agent.py",
+      "filePath": "scripts/verify_agent.py",
+      "summary": "End-to-end smoke test for the agent run loop: injects a MockLLMClient into the factory cache and exercises run_agent to confirm the graph executes and the mock satisfies the LLMClient protocol.",
+      "tags": ["test", "verification", "smoke-test", "script"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:scripts/verify_agent.py:MockLLMClient",
+      "type": "class",
+      "name": "MockLLMClient",
+      "filePath": "scripts/verify_agent.py",
+      "lineRange": [25, 69],
+      "summary": "Test double implementing the LLMClient protocol with scripted ChatResponse replies (including a tool-call response) and a streaming adapter reused by the verify harness.",
+      "tags": ["mock", "test-double", "llm"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/verify_agent.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/verify_agent.py",
+      "lineRange": [72, 119],
+      "summary": "Smoke-test entry point: clears the LLM cache, registers the mock client, and runs the agent through a couple of scripted turns printing verification checkpoints.",
+      "tags": ["test", "entry-point", "verification"],
+      "complexity": "moderate"
+    },
+
+    {
+      "id": "file:scripts/verify_hermes.py",
+      "type": "file",
+      "name": "verify_hermes.py",
+      "filePath": "scripts/verify_hermes.py",
+      "summary": "End-to-end smoke test for the Hermes self-improvement loop: drives memory_learner.learn_from_conversation and exercises the prompt_store save/list/rollback lifecycle with a mock LLM.",
+      "tags": ["test", "verification", "smoke-test", "hermes"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:scripts/verify_hermes.py:HermesMockLLM",
+      "type": "class",
+      "name": "HermesMockLLM",
+      "filePath": "scripts/verify_hermes.py",
+      "lineRange": [24, 53],
+      "summary": "Test double implementing LLMClient that returns scripted extraction responses used to drive the memory learner in the verify harness.",
+      "tags": ["mock", "test-double", "llm"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/verify_hermes.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/verify_hermes.py",
+      "lineRange": [56, 139],
+      "summary": "Smoke-test entry point that runs memory learning then saves, lists, and rolls back prompt versions, printing verification checkpoints throughout.",
+      "tags": ["test", "entry-point", "verification"],
+      "complexity": "moderate"
+    },
+
+    {
+      "id": "file:scripts/verify_phase2.py",
+      "type": "file",
+      "name": "verify_phase2.py",
+      "filePath": "scripts/verify_phase2.py",
+      "summary": "Smoke test for phase-2 subsystems: checks the skill and tool registries, MCP server build/config loading, system-prompt assembly, and a mock-driven agent run.",
+      "tags": ["test", "verification", "smoke-test", "script"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:scripts/verify_phase2.py:MockLLM",
+      "type": "class",
+      "name": "MockLLM",
+      "filePath": "scripts/verify_phase2.py",
+      "lineRange": [25, 58],
+      "summary": "Test double implementing LLMClient that returns scripted responses, including a tool-call turn, for the phase-2 verify harness.",
+      "tags": ["mock", "test-double", "llm"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/verify_phase2.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/verify_phase2.py",
+      "lineRange": [61, 141],
+      "summary": "Smoke-test entry point that validates skills, tools, MCP wiring, prompt assembly, and a mock agent run, printing verification checkpoints.",
+      "tags": ["test", "entry-point", "verification"],
+      "complexity": "moderate"
+    },
+
+    {
+      "id": "file:scripts/verify_stream.py",
+      "type": "file",
+      "name": "verify_stream.py",
+      "filePath": "scripts/verify_stream.py",
+      "summary": "Smoke test for the streaming agent path: runs stream_agent with a mock streaming LLM and collects the emitted event stream to validate streaming chunks and tool events.",
+      "tags": ["test", "verification", "smoke-test", "streaming"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:scripts/verify_stream.py:MockStreamLLM",
+      "type": "class",
+      "name": "MockStreamLLM",
+      "filePath": "scripts/verify_stream.py",
+      "lineRange": [24, 70],
+      "summary": "Test double implementing LLMClient whose stream_chat yields scripted StreamChunk increments used to validate the agent's streaming path.",
+      "tags": ["mock", "test-double", "llm", "streaming"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/verify_stream.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/verify_stream.py",
+      "lineRange": [73, 126],
+      "summary": "Smoke-test entry point that runs stream_agent with the mock client and inspects the streamed events, printing verification checkpoints.",
+      "tags": ["test", "entry-point", "verification", "streaming"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {"source": "file:app/agent/context_manager.py", "target": "function:app/agent/context_manager.py:compress_if_needed", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/agent/context_manager.py", "target": "function:app/agent/context_manager.py:_generate_summary", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/agent/context_manager.py", "target": "function:app/agent/context_manager.py:compress_if_needed", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/agent/context_manager.py", "target": "file:app/core/logging.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/agent/context_manager.py", "target": "file:app/llm/factory.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/agent/context_manager.py", "target": "file:app/llm/models.py", "type": "imports", "direction": "forward", "weight": 0.7},
+
+    {"source": "file:app/core/exceptions.py", "target": "class:app/core/exceptions.py:AppError", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/core/exceptions.py", "target": "class:app/core/exceptions.py:ConfigError", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/core/exceptions.py", "target": "class:app/core/exceptions.py:LLMError", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/core/exceptions.py", "target": "class:app/core/exceptions.py:AgentError", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/core/exceptions.py", "target": "class:app/core/exceptions.py:ForbiddenError", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/core/exceptions.py", "target": "class:app/core/exceptions.py:NotFoundError", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/core/exceptions.py", "target": "function:app/core/exceptions.py:register_exception_handlers", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/core/exceptions.py", "target": "class:app/core/exceptions.py:AppError", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/core/exceptions.py", "target": "class:app/core/exceptions.py:ConfigError", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/core/exceptions.py", "target": "class:app/core/exceptions.py:LLMError", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/core/exceptions.py", "target": "class:app/core/exceptions.py:AgentError", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/core/exceptions.py", "target": "class:app/core/exceptions.py:ForbiddenError", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/core/exceptions.py", "target": "class:app/core/exceptions.py:NotFoundError", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/core/exceptions.py", "target": "function:app/core/exceptions.py:register_exception_handlers", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "class:app/core/exceptions.py:ConfigError", "target": "class:app/core/exceptions.py:AppError", "type": "inherits", "direction": "forward", "weight": 0.9},
+    {"source": "class:app/core/exceptions.py:LLMError", "target": "class:app/core/exceptions.py:AppError", "type": "inherits", "direction": "forward", "weight": 0.9},
+    {"source": "class:app/core/exceptions.py:AgentError", "target": "class:app/core/exceptions.py:AppError", "type": "inherits", "direction": "forward", "weight": 0.9},
+    {"source": "class:app/core/exceptions.py:ForbiddenError", "target": "class:app/core/exceptions.py:AppError", "type": "inherits", "direction": "forward", "weight": 0.9},
+    {"source": "class:app/core/exceptions.py:NotFoundError", "target": "class:app/core/exceptions.py:AppError", "type": "inherits", "direction": "forward", "weight": 0.9},
+
+    {"source": "file:app/evolution/memory_learner.py", "target": "function:app/evolution/memory_learner.py:learn_from_conversation", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/evolution/memory_learner.py", "target": "function:app/evolution/memory_learner.py:_parse_extraction", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/evolution/memory_learner.py", "target": "function:app/evolution/memory_learner.py:_save_learned", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/evolution/memory_learner.py", "target": "function:app/evolution/memory_learner.py:learn_from_conversation", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/evolution/memory_learner.py", "target": "file:app/core/logging.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/evolution/memory_learner.py", "target": "file:app/llm/factory.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/evolution/memory_learner.py", "target": "file:app/llm/models.py", "type": "imports", "direction": "forward", "weight": 0.7},
+
+    {"source": "file:app/evolution/prompt_store.py", "target": "function:app/evolution/prompt_store.py:get_current_prompt", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/evolution/prompt_store.py", "target": "function:app/evolution/prompt_store.py:get_current_version", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/evolution/prompt_store.py", "target": "function:app/evolution/prompt_store.py:save_version", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/evolution/prompt_store.py", "target": "function:app/evolution/prompt_store.py:list_versions", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/evolution/prompt_store.py", "target": "function:app/evolution/prompt_store.py:rollback", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/evolution/prompt_store.py", "target": "function:app/evolution/prompt_store.py:get_current_prompt", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/evolution/prompt_store.py", "target": "function:app/evolution/prompt_store.py:get_current_version", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/evolution/prompt_store.py", "target": "function:app/evolution/prompt_store.py:save_version", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/evolution/prompt_store.py", "target": "function:app/evolution/prompt_store.py:list_versions", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/evolution/prompt_store.py", "target": "function:app/evolution/prompt_store.py:rollback", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/evolution/prompt_store.py", "target": "file:app/core/logging.py", "type": "imports", "direction": "forward", "weight": 0.7},
+
+    {"source": "file:app/evolution/reflector.py", "target": "function:app/evolution/reflector.py:reflect", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/evolution/reflector.py", "target": "function:app/evolution/reflector.py:_fetch_recent_samples", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/evolution/reflector.py", "target": "function:app/evolution/reflector.py:_parse_reflection", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/evolution/reflector.py", "target": "function:app/evolution/reflector.py:reflect", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/evolution/reflector.py", "target": "file:app/core/logging.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/evolution/reflector.py", "target": "file:app/evolution/prompt_store.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/evolution/reflector.py", "target": "file:app/llm/factory.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/evolution/reflector.py", "target": "file:app/llm/models.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "function:app/evolution/reflector.py:reflect", "target": "function:app/evolution/prompt_store.py:get_current_prompt", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "function:app/evolution/reflector.py:reflect", "target": "function:app/evolution/prompt_store.py:save_version", "type": "calls", "direction": "forward", "weight": 0.8},
+
+    {"source": "file:app/llm/__init__.py", "target": "file:app/llm/base.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/llm/__init__.py", "target": "file:app/llm/factory.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/llm/__init__.py", "target": "file:app/llm/models.py", "type": "imports", "direction": "forward", "weight": 0.7},
+
+    {"source": "file:app/llm/base.py", "target": "class:app/llm/base.py:LLMClient", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/llm/base.py", "target": "class:app/llm/base.py:LLMClient", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/llm/base.py", "target": "file:app/llm/models.py", "type": "imports", "direction": "forward", "weight": 0.7},
+
+    {"source": "file:app/llm/factory.py", "target": "function:app/llm/factory.py:create_llm_client", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/llm/factory.py", "target": "function:app/llm/factory.py:get_llm_client", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/llm/factory.py", "target": "function:app/llm/factory.py:create_llm_client", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/llm/factory.py", "target": "function:app/llm/factory.py:get_llm_client", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/llm/factory.py", "target": "file:app/core/config.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/llm/factory.py", "target": "file:app/core/exceptions.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/llm/factory.py", "target": "file:app/llm/base.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/llm/factory.py", "target": "file:app/llm/providers/anthropic.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/llm/factory.py", "target": "file:app/llm/providers/openai_like.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "function:app/llm/factory.py:create_llm_client", "target": "class:app/llm/providers/openai_like.py:OpenAILikeClient", "type": "calls", "direction": "forward", "weight": 0.8},
+    {"source": "function:app/llm/factory.py:create_llm_client", "target": "class:app/llm/providers/anthropic.py:AnthropicClient", "type": "calls", "direction": "forward", "weight": 0.8},
+
+    {"source": "file:app/llm/models.py", "target": "class:app/llm/models.py:ToolCall", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/llm/models.py", "target": "class:app/llm/models.py:ChatMessage", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/llm/models.py", "target": "class:app/llm/models.py:ToolDefinition", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/llm/models.py", "target": "class:app/llm/models.py:Usage", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/llm/models.py", "target": "class:app/llm/models.py:ChatRequest", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/llm/models.py", "target": "class:app/llm/models.py:ChatResponse", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/llm/models.py", "target": "class:app/llm/models.py:StreamChunk", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/llm/models.py", "target": "class:app/llm/models.py:ToolCall", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/llm/models.py", "target": "class:app/llm/models.py:ChatMessage", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/llm/models.py", "target": "class:app/llm/models.py:ToolDefinition", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/llm/models.py", "target": "class:app/llm/models.py:Usage", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/llm/models.py", "target": "class:app/llm/models.py:ChatRequest", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/llm/models.py", "target": "class:app/llm/models.py:ChatResponse", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/llm/models.py", "target": "class:app/llm/models.py:StreamChunk", "type": "exports", "direction": "forward", "weight": 0.8},
+
+    {"source": "file:app/llm/providers/anthropic.py", "target": "class:app/llm/providers/anthropic.py:AnthropicClient", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/llm/providers/anthropic.py", "target": "class:app/llm/providers/anthropic.py:AnthropicClient", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/llm/providers/anthropic.py", "target": "file:app/core/exceptions.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/llm/providers/anthropic.py", "target": "file:app/core/logging.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/llm/providers/anthropic.py", "target": "file:app/llm/models.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "class:app/llm/providers/anthropic.py:AnthropicClient", "target": "class:app/llm/base.py:LLMClient", "type": "implements", "direction": "forward", "weight": 0.9},
+
+    {"source": "file:app/llm/providers/openai_like.py", "target": "class:app/llm/providers/openai_like.py:OpenAILikeClient", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:app/llm/providers/openai_like.py", "target": "class:app/llm/providers/openai_like.py:OpenAILikeClient", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:app/llm/providers/openai_like.py", "target": "file:app/core/exceptions.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/llm/providers/openai_like.py", "target": "file:app/core/logging.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/llm/providers/openai_like.py", "target": "file:app/llm/models.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "class:app/llm/providers/openai_like.py:OpenAILikeClient", "target": "class:app/llm/base.py:LLMClient", "type": "implements", "direction": "forward", "weight": 0.9},
+
+    {"source": "file:scripts/verify_agent.py", "target": "class:scripts/verify_agent.py:MockLLMClient", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:scripts/verify_agent.py", "target": "function:scripts/verify_agent.py:main", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:scripts/verify_agent.py", "target": "file:app/llm/base.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:scripts/verify_agent.py", "target": "file:app/llm/models.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/llm/base.py", "target": "file:scripts/verify_agent.py", "type": "tested_by", "direction": "forward", "weight": 0.5},
+
+    {"source": "file:scripts/verify_hermes.py", "target": "class:scripts/verify_hermes.py:HermesMockLLM", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:scripts/verify_hermes.py", "target": "function:scripts/verify_hermes.py:main", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:scripts/verify_hermes.py", "target": "file:app/llm/models.py", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:app/evolution/memory_learner.py", "target": "file:scripts/verify_hermes.py", "type": "tested_by", "direction": "forward", "weight": 0.5},
+    {"source": "file:app/evolution/prompt_store.py", "target": "file:scripts/verify_hermes.py", "type": "tested_by", "direction": "forward", "weight": 0.5},
+
+    {"source": "file:scripts/verify_phase2.py", "target": "class:scripts/verify_phase2.py:MockLLM", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:scripts/verify_phase2.py", "target": "function:scripts/verify_phase2.py:main", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:scripts/verify_phase2.py", "target": "file:app/llm/models.py", "type": "imports", "direction": "forward", "weight": 0.7},
+
+    {"source": "file:scripts/verify_stream.py", "target": "class:scripts/verify_stream.py:MockStreamLLM", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:scripts/verify_stream.py", "target": "function:scripts/verify_stream.py:main", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:scripts/verify_stream.py", "target": "file:app/llm/models.py", "type": "imports", "direction": "forward", "weight": 0.7}
+  ]
+}

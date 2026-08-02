@@ -1,0 +1,31 @@
+{
+  "projectRoot": "e:/AIwork/Self-Agent",
+  "batchFiles": [
+    {"path": "app/a2a/client.py", "language": "python", "sizeLines": 167, "fileCategory": "code"},
+    {"path": "app/api/upload_routes.py", "language": "python", "sizeLines": 141, "fileCategory": "code"},
+    {"path": "app/core/config.py", "language": "python", "sizeLines": 241, "fileCategory": "code"},
+    {"path": "app/main.py", "language": "python", "sizeLines": 208, "fileCategory": "code"},
+    {"path": "app/mcp/client.py", "language": "python", "sizeLines": 115, "fileCategory": "code"},
+    {"path": "app/memory/checkpointer.py", "language": "python", "sizeLines": 91, "fileCategory": "code"},
+    {"path": "app/memory/embeddings.py", "language": "python", "sizeLines": 134, "fileCategory": "code"},
+    {"path": "app/memory/pg.py", "language": "python", "sizeLines": 88, "fileCategory": "code"},
+    {"path": "app/memory/store.py", "language": "python", "sizeLines": 161, "fileCategory": "code"},
+    {"path": "app/rag/routes.py", "language": "python", "sizeLines": 51, "fileCategory": "code"},
+    {"path": "app/rag/service.py", "language": "python", "sizeLines": 185, "fileCategory": "code"},
+    {"path": "app/services/observability.py", "language": "python", "sizeLines": 95, "fileCategory": "code"}
+  ],
+  "batchImportData": {
+    "app/a2a/client.py": ["app/core/config.py", "app/core/logging.py"],
+    "app/api/upload_routes.py": ["app/auth/dependencies.py", "app/core/config.py", "app/core/logging.py"],
+    "app/core/config.py": [],
+    "app/main.py": ["app/api/routes.py", "app/api/upload_routes.py", "app/auth/routes.py", "app/core/config.py", "app/core/exceptions.py", "app/core/logging.py", "app/core/telemetry.py", "app/db/manager.py", "app/mcp/client.py", "app/middleware/rate_limit.py", "app/rag/routes.py", "app/services/observability.py"],
+    "app/mcp/client.py": ["app/core/config.py", "app/core/logging.py"],
+    "app/memory/checkpointer.py": ["app/core/config.py", "app/core/logging.py", "app/memory/pg.py"],
+    "app/memory/embeddings.py": ["app/core/config.py", "app/core/logging.py"],
+    "app/memory/pg.py": ["app/core/config.py", "app/core/logging.py"],
+    "app/memory/store.py": ["app/core/logging.py", "app/memory/embeddings.py", "app/memory/pg.py"],
+    "app/rag/routes.py": ["app/auth/dependencies.py", "app/rag/service.py"],
+    "app/rag/service.py": ["app/core/logging.py", "app/memory/store.py"],
+    "app/services/observability.py": ["app/db/manager.py", "app/memory/checkpointer.py"]
+  }
+}

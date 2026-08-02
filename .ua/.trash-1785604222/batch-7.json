@@ -1,0 +1,229 @@
+{
+  "nodes": [
+    {
+      "id": "file:app/skills/base.py",
+      "type": "file",
+      "name": "base.py",
+      "filePath": "app/skills/base.py",
+      "summary": "Defines the Skill subsystem's core contract: SkillMeta (frozen metadata dataclass) and SkillBase (abstract base class with on_load/on_unload lifecycle hooks and tool/prompt slots that every skill implements).",
+      "tags": ["skill", "base-class", "interface", "data-model"],
+      "complexity": "moderate",
+      "languageNotes": "SkillMeta uses @dataclass for declarative metadata records; SkillBase defines the lifecycle + binding protocol expected of all concrete skills."
+    },
+    {
+      "id": "file:app/skills/builtin.py",
+      "type": "file",
+      "name": "builtin.py",
+      "filePath": "app/skills/builtin.py",
+      "summary": "Ships the project's default skill implementations, including MathSkill (a math assistant) backed by the advanced_math tool, which performs safe AST-based arithmetic evaluation rather than eval().",
+      "tags": ["skill", "builtin", "math", "tool"],
+      "complexity": "moderate",
+      "languageNotes": "advanced_math walks the parsed AST via a recursive _eval over ast.BinOp / UnaryOp / Constant nodes to evaluate arithmetic without exposing eval()/exec()."
+    },
+    {
+      "id": "file:app/skills/registry.py",
+      "type": "file",
+      "name": "registry.py",
+      "filePath": "app/skills/registry.py",
+      "summary": "Implements SkillRegistry, the central registry/singleton that registers, loads, and unloads Skill classes (delegating tool registration on load), plus the @skill decorator for declarative SkillMeta-driven registration.",
+      "tags": ["skill", "registry", "decorator", "singleton"],
+      "complexity": "moderate",
+      "languageNotes": "The @skill decorator returns a closure capturing a SkillMeta; the closure runs at class-definition time so a skill is registered simply by being imported."
+    },
+    {
+      "id": "class:app/skills/base.py:SkillMeta",
+      "type": "class",
+      "name": "SkillMeta",
+      "filePath": "app/skills/base.py",
+      "lineRange": [17, 25],
+      "summary": "Dataclass capturing a skill's name, description, version, tags, author, and enabled-by-default flag, used as the canonical descriptor passed to the registry.",
+      "tags": ["data-model", "metadata", "skill"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/skills/base.py:SkillBase",
+      "type": "class",
+      "name": "SkillBase",
+      "filePath": "app/skills/base.py",
+      "lineRange": [28, 69],
+      "summary": "Abstract base class defining the skill lifecycle (on_load/on_unload), tool/prompt bindings, and a describe() accessor that returns the skill's metadata snapshot.",
+      "tags": ["base-class", "interface", "skill", "lifecycle"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/skills/builtin.py:advanced_math",
+      "type": "function",
+      "name": "advanced_math",
+      "filePath": "app/skills/builtin.py",
+      "lineRange": [21, 56],
+      "summary": "Recursive AST-based arithmetic evaluator supporting binary operations, unary operations, and constants on a parsed expression tree, raising on unsupported nodes to keep evaluation safe.",
+      "tags": ["tool", "math", "evaluator", "ast"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:app/skills/builtin.py:MathSkill",
+      "type": "class",
+      "name": "MathSkill",
+      "filePath": "app/skills/builtin.py",
+      "lineRange": [66, 78],
+      "summary": "Built-in math-assistant skill extending SkillBase, binding the advanced_math tool and a system prompt that steers the agent to compute precisely rather than guess.",
+      "tags": ["skill", "builtin", "math", "implementation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/skills/registry.py:SkillRegistry",
+      "type": "class",
+      "name": "SkillRegistry",
+      "filePath": "app/skills/registry.py",
+      "lineRange": [27, 106],
+      "summary": "Central registry tracking registered and loaded skills; orchestrates load/unload lifecycle, delegates tool registration to the tool registry on load, and exposes lookup and listing helpers.",
+      "tags": ["registry", "singleton", "skill", "service"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/skills/registry.py:skill",
+      "type": "function",
+      "name": "skill",
+      "filePath": "app/skills/registry.py",
+      "lineRange": [113, 145],
+      "summary": "Declarative class decorator factory that builds a SkillMeta from the supplied kwargs and registers the decorated SkillBase subclass with the global (or supplied) registry via a returned closure.",
+      "tags": ["decorator", "factory", "registration", "skill"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:app/skills/builtin.py",
+      "target": "file:app/skills/base.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/skills/builtin.py",
+      "target": "file:app/skills/registry.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/skills/registry.py",
+      "target": "file:app/core/logging.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/skills/registry.py",
+      "target": "file:app/skills/base.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/skills/base.py",
+      "target": "class:app/skills/base.py:SkillMeta",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/skills/base.py",
+      "target": "class:app/skills/base.py:SkillBase",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/skills/builtin.py",
+      "target": "function:app/skills/builtin.py:advanced_math",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/skills/builtin.py",
+      "target": "class:app/skills/builtin.py:MathSkill",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/skills/registry.py",
+      "target": "class:app/skills/registry.py:SkillRegistry",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/skills/registry.py",
+      "target": "function:app/skills/registry.py:skill",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/skills/base.py",
+      "target": "class:app/skills/base.py:SkillMeta",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/skills/base.py",
+      "target": "class:app/skills/base.py:SkillBase",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/skills/builtin.py",
+      "target": "function:app/skills/builtin.py:advanced_math",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/skills/builtin.py",
+      "target": "class:app/skills/builtin.py:MathSkill",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/skills/registry.py",
+      "target": "class:app/skills/registry.py:SkillRegistry",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/skills/registry.py",
+      "target": "function:app/skills/registry.py:skill",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:app/skills/builtin.py:MathSkill",
+      "target": "class:app/skills/base.py:SkillBase",
+      "type": "inherits",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "function:app/skills/registry.py:skill",
+      "target": "class:app/skills/base.py:SkillMeta",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:app/skills/builtin.py:MathSkill",
+      "target": "function:app/skills/registry.py:skill",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

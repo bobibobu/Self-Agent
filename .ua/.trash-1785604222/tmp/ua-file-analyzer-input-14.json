@@ -1,0 +1,182 @@
+{
+  "projectRoot": "e:/AIwork/Self-Agent",
+  "batchFiles": [
+    {
+      "path": "clients/web/src/App.css",
+      "language": "css",
+      "sizeLines": 168,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "clients/web/src/index.css",
+      "language": "css",
+      "sizeLines": 7,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "clients/web/vite.config.js",
+      "language": "javascript",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "docs/00-overview/02-从零读懂.md",
+      "language": "markdown",
+      "sizeLines": 549,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/00-overview/README.md",
+      "language": "markdown",
+      "sizeLines": 426,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/01-architecture/README.md",
+      "language": "markdown",
+      "sizeLines": 254,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/03-development/01-setup.md",
+      "language": "markdown",
+      "sizeLines": 160,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/03-development/README.md",
+      "language": "markdown",
+      "sizeLines": 40,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/04-guides/README.md",
+      "language": "markdown",
+      "sizeLines": 43,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/05-interview/README.md",
+      "language": "markdown",
+      "sizeLines": 240,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "infra/README.md",
+      "language": "markdown",
+      "sizeLines": 150,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "infra/docker-compose.yml",
+      "language": "yaml",
+      "sizeLines": 144,
+      "fileCategory": "infra"
+    },
+    {
+      "path": "infra/mongo/init.js",
+      "language": "javascript",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "infra/postgres/init.sql",
+      "language": "sql",
+      "sizeLines": 82,
+      "fileCategory": "data"
+    },
+    {
+      "path": "mcp_servers.json.example",
+      "language": "json",
+      "sizeLines": 32,
+      "fileCategory": "config"
+    },
+    {
+      "path": "scripts/cleanup_test_data.py",
+      "language": "python",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/verify_e2e.py",
+      "language": "python",
+      "sizeLines": 169,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/verify_phase3.py",
+      "language": "python",
+      "sizeLines": 97,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/verify_phase4.py",
+      "language": "python",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/verify_phase8.py",
+      "language": "python",
+      "sizeLines": 157,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/verify_sessions.py",
+      "language": "python",
+      "sizeLines": 97,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/conftest.py",
+      "language": "python",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_api_smoke.py",
+      "language": "python",
+      "sizeLines": 169,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_client_contract.py",
+      "language": "python",
+      "sizeLines": 291,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_coding_tools.py",
+      "language": "python",
+      "sizeLines": 283,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "clients/web/src/App.css": [],
+    "clients/web/src/index.css": [],
+    "clients/web/vite.config.js": [],
+    "docs/00-overview/02-从零读懂.md": [],
+    "docs/00-overview/README.md": [],
+    "docs/01-architecture/README.md": [],
+    "docs/03-development/01-setup.md": [],
+    "docs/03-development/README.md": [],
+    "docs/04-guides/README.md": [],
+    "docs/05-interview/README.md": [],
+    "infra/README.md": [],
+    "infra/docker-compose.yml": [],
+    "infra/mongo/init.js": [],
+    "infra/postgres/init.sql": [],
+    "mcp_servers.json.example": [],
+    "scripts/cleanup_test_data.py": [],
+    "scripts/verify_e2e.py": [],
+    "scripts/verify_phase3.py": [],
+    "scripts/verify_phase4.py": [],
+    "scripts/verify_phase8.py": [],
+    "scripts/verify_sessions.py": [],
+    "tests/conftest.py": [],
+    "tests/test_api_smoke.py": [],
+    "tests/test_client_contract.py": [],
+    "tests/test_coding_tools.py": []
+  }
+}

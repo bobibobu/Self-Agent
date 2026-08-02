@@ -1,0 +1,1726 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 3,
+  "filesSkipped": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 3,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 3,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "clients/cli/selfagent_cli/api.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 136,
+      "nonEmptyLines": 110,
+      "functions": [
+        {
+          "name": "auth_headers",
+          "startLine": 26,
+          "endLine": 30,
+          "params": [
+            "token",
+            "extra"
+          ]
+        },
+        {
+          "name": "_raise_for_auth",
+          "startLine": 33,
+          "endLine": 35,
+          "params": [
+            "resp"
+          ]
+        },
+        {
+          "name": "login",
+          "startLine": 38,
+          "endLine": 51,
+          "params": [
+            "api_url",
+            "username",
+            "password"
+          ]
+        },
+        {
+          "name": "register",
+          "startLine": 54,
+          "endLine": 64,
+          "params": [
+            "api_url",
+            "username",
+            "password"
+          ]
+        },
+        {
+          "name": "_error_message",
+          "startLine": 67,
+          "endLine": 77,
+          "params": [
+            "data",
+            "fallback"
+          ]
+        },
+        {
+          "name": "stream_chat",
+          "startLine": 80,
+          "endLine": 109,
+          "params": [
+            "api_url",
+            "message",
+            "thread_id",
+            "user_id",
+            "token",
+            "timeout"
+          ]
+        },
+        {
+          "name": "get_json",
+          "startLine": 112,
+          "endLine": 125,
+          "params": [
+            "api_url",
+            "path",
+            "token",
+            "params"
+          ]
+        },
+        {
+          "name": "post_json",
+          "startLine": 128,
+          "endLine": 136,
+          "params": [
+            "api_url",
+            "path",
+            "token",
+            "params"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "AuthRequired",
+          "startLine": 22,
+          "endLine": 23,
+          "methods": [],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "AuthRequired",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "auth_headers",
+          "line": 26,
+          "isDefault": false
+        },
+        {
+          "name": "_raise_for_auth",
+          "line": 33,
+          "isDefault": false
+        },
+        {
+          "name": "login",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "register",
+          "line": 54,
+          "isDefault": false
+        },
+        {
+          "name": "_error_message",
+          "line": 67,
+          "isDefault": false
+        },
+        {
+          "name": "stream_chat",
+          "line": 80,
+          "isDefault": false
+        },
+        {
+          "name": "get_json",
+          "line": 112,
+          "isDefault": false
+        },
+        {
+          "name": "post_json",
+          "line": 128,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "auth_headers",
+          "callee": "dict",
+          "lineNumber": 27
+        },
+        {
+          "caller": "_raise_for_auth",
+          "callee": "AuthRequired",
+          "lineNumber": 35
+        },
+        {
+          "caller": "login",
+          "callee": "httpx.AsyncClient",
+          "lineNumber": 43
+        },
+        {
+          "caller": "login",
+          "callee": "client.post",
+          "lineNumber": 44
+        },
+        {
+          "caller": "login",
+          "callee": "resp.json",
+          "lineNumber": 48
+        },
+        {
+          "caller": "login",
+          "callee": "RuntimeError",
+          "lineNumber": 50
+        },
+        {
+          "caller": "login",
+          "callee": "_error_message",
+          "lineNumber": 50
+        },
+        {
+          "caller": "register",
+          "callee": "httpx.AsyncClient",
+          "lineNumber": 56
+        },
+        {
+          "caller": "register",
+          "callee": "client.post",
+          "lineNumber": 57
+        },
+        {
+          "caller": "register",
+          "callee": "resp.json",
+          "lineNumber": 61
+        },
+        {
+          "caller": "register",
+          "callee": "RuntimeError",
+          "lineNumber": 63
+        },
+        {
+          "caller": "register",
+          "callee": "_error_message",
+          "lineNumber": 63
+        },
+        {
+          "caller": "_error_message",
+          "callee": "isinstance",
+          "lineNumber": 69
+        },
+        {
+          "caller": "_error_message",
+          "callee": "isinstance",
+          "lineNumber": 70
+        },
+        {
+          "caller": "_error_message",
+          "callee": "data.get",
+          "lineNumber": 70
+        },
+        {
+          "caller": "_error_message",
+          "callee": "data.get",
+          "lineNumber": 72
+        },
+        {
+          "caller": "_error_message",
+          "callee": "isinstance",
+          "lineNumber": 73
+        },
+        {
+          "caller": "_error_message",
+          "callee": "isinstance",
+          "lineNumber": 75
+        },
+        {
+          "caller": "_error_message",
+          "callee": "detail[0].get",
+          "lineNumber": 76
+        },
+        {
+          "caller": "stream_chat",
+          "callee": "httpx.AsyncClient",
+          "lineNumber": 93
+        },
+        {
+          "caller": "stream_chat",
+          "callee": "client.stream",
+          "lineNumber": 93
+        },
+        {
+          "caller": "stream_chat",
+          "callee": "auth_headers",
+          "lineNumber": 97
+        },
+        {
+          "caller": "stream_chat",
+          "callee": "AuthRequired",
+          "lineNumber": 100
+        },
+        {
+          "caller": "stream_chat",
+          "callee": "resp.raise_for_status",
+          "lineNumber": 101
+        },
+        {
+          "caller": "stream_chat",
+          "callee": "resp.aiter_lines",
+          "lineNumber": 102
+        },
+        {
+          "caller": "stream_chat",
+          "callee": "line.strip",
+          "lineNumber": 103
+        },
+        {
+          "caller": "stream_chat",
+          "callee": "json.loads",
+          "lineNumber": 107
+        },
+        {
+          "caller": "get_json",
+          "callee": "httpx.AsyncClient",
+          "lineNumber": 119
+        },
+        {
+          "caller": "get_json",
+          "callee": "client.get",
+          "lineNumber": 120
+        },
+        {
+          "caller": "get_json",
+          "callee": "auth_headers",
+          "lineNumber": 121
+        },
+        {
+          "caller": "get_json",
+          "callee": "_raise_for_auth",
+          "lineNumber": 123
+        },
+        {
+          "caller": "get_json",
+          "callee": "resp.raise_for_status",
+          "lineNumber": 124
+        },
+        {
+          "caller": "get_json",
+          "callee": "resp.json",
+          "lineNumber": 125
+        },
+        {
+          "caller": "post_json",
+          "callee": "httpx.AsyncClient",
+          "lineNumber": 132
+        },
+        {
+          "caller": "post_json",
+          "callee": "client.post",
+          "lineNumber": 133
+        },
+        {
+          "caller": "post_json",
+          "callee": "auth_headers",
+          "lineNumber": 133
+        },
+        {
+          "caller": "post_json",
+          "callee": "_raise_for_auth",
+          "lineNumber": 134
+        },
+        {
+          "caller": "post_json",
+          "callee": "resp.raise_for_status",
+          "lineNumber": 135
+        },
+        {
+          "caller": "post_json",
+          "callee": "resp.json",
+          "lineNumber": 136
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 9,
+        "functionCount": 8,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "clients/cli/selfagent_cli/config.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 86,
+      "nonEmptyLines": 65,
+      "functions": [
+        {
+          "name": "get_api_url",
+          "startLine": 11,
+          "endLine": 13,
+          "params": []
+        },
+        {
+          "name": "_credentials_path",
+          "startLine": 16,
+          "endLine": 19,
+          "params": []
+        },
+        {
+          "name": "load_credentials",
+          "startLine": 22,
+          "endLine": 30,
+          "params": []
+        },
+        {
+          "name": "save_credentials",
+          "startLine": 33,
+          "endLine": 41,
+          "params": [
+            "token",
+            "user"
+          ]
+        },
+        {
+          "name": "clear_credentials",
+          "startLine": 44,
+          "endLine": 48,
+          "params": []
+        }
+      ],
+      "classes": [
+        {
+          "name": "Session",
+          "startLine": 51,
+          "endLine": 86,
+          "methods": [
+            "__init__",
+            "is_logged_in",
+            "set_auth",
+            "logout",
+            "reset_thread"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "get_api_url",
+          "line": 11,
+          "isDefault": false
+        },
+        {
+          "name": "_credentials_path",
+          "line": 16,
+          "isDefault": false
+        },
+        {
+          "name": "load_credentials",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "save_credentials",
+          "line": 33,
+          "isDefault": false
+        },
+        {
+          "name": "clear_credentials",
+          "line": 44,
+          "isDefault": false
+        },
+        {
+          "name": "Session",
+          "line": 51,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "get_api_url",
+          "callee": "os.environ.get(\"AGENT_API_URL\", \"http://localhost:8000\").rstrip",
+          "lineNumber": 13
+        },
+        {
+          "caller": "get_api_url",
+          "callee": "os.environ.get",
+          "lineNumber": 13
+        },
+        {
+          "caller": "_credentials_path",
+          "callee": "os.environ.get",
+          "lineNumber": 18
+        },
+        {
+          "caller": "_credentials_path",
+          "callee": "os.path.expanduser",
+          "lineNumber": 18
+        },
+        {
+          "caller": "_credentials_path",
+          "callee": "Path",
+          "lineNumber": 19
+        },
+        {
+          "caller": "load_credentials",
+          "callee": "_credentials_path",
+          "lineNumber": 24
+        },
+        {
+          "caller": "load_credentials",
+          "callee": "path.exists",
+          "lineNumber": 25
+        },
+        {
+          "caller": "load_credentials",
+          "callee": "json.loads",
+          "lineNumber": 28
+        },
+        {
+          "caller": "load_credentials",
+          "callee": "path.read_text",
+          "lineNumber": 28
+        },
+        {
+          "caller": "save_credentials",
+          "callee": "_credentials_path",
+          "lineNumber": 35
+        },
+        {
+          "caller": "save_credentials",
+          "callee": "path.parent.mkdir",
+          "lineNumber": 36
+        },
+        {
+          "caller": "save_credentials",
+          "callee": "get_api_url",
+          "lineNumber": 37
+        },
+        {
+          "caller": "save_credentials",
+          "callee": "path.write_text",
+          "lineNumber": 38
+        },
+        {
+          "caller": "save_credentials",
+          "callee": "json.dumps",
+          "lineNumber": 38
+        },
+        {
+          "caller": "save_credentials",
+          "callee": "os.chmod",
+          "lineNumber": 40
+        },
+        {
+          "caller": "clear_credentials",
+          "callee": "_credentials_path",
+          "lineNumber": 46
+        },
+        {
+          "caller": "clear_credentials",
+          "callee": "path.exists",
+          "lineNumber": 47
+        },
+        {
+          "caller": "clear_credentials",
+          "callee": "path.unlink",
+          "lineNumber": 48
+        },
+        {
+          "caller": "__init__",
+          "callee": "get_api_url",
+          "lineNumber": 55
+        },
+        {
+          "caller": "__init__",
+          "callee": "str",
+          "lineNumber": 56
+        },
+        {
+          "caller": "__init__",
+          "callee": "os.getpid",
+          "lineNumber": 56
+        },
+        {
+          "caller": "__init__",
+          "callee": "load_credentials",
+          "lineNumber": 59
+        },
+        {
+          "caller": "__init__",
+          "callee": "creds.get",
+          "lineNumber": 60
+        },
+        {
+          "caller": "__init__",
+          "callee": "creds.get",
+          "lineNumber": 61
+        },
+        {
+          "caller": "__init__",
+          "callee": "user.get",
+          "lineNumber": 63
+        },
+        {
+          "caller": "__init__",
+          "callee": "user.get",
+          "lineNumber": 64
+        },
+        {
+          "caller": "is_logged_in",
+          "callee": "bool",
+          "lineNumber": 68
+        },
+        {
+          "caller": "set_auth",
+          "callee": "user.get",
+          "lineNumber": 72
+        },
+        {
+          "caller": "set_auth",
+          "callee": "user.get",
+          "lineNumber": 73
+        },
+        {
+          "caller": "set_auth",
+          "callee": "save_credentials",
+          "lineNumber": 74
+        },
+        {
+          "caller": "logout",
+          "callee": "clear_credentials",
+          "lineNumber": 80
+        },
+        {
+          "caller": "reset_thread",
+          "callee": "str",
+          "lineNumber": 86
+        },
+        {
+          "caller": "reset_thread",
+          "callee": "int",
+          "lineNumber": 86
+        },
+        {
+          "caller": "reset_thread",
+          "callee": "time.time",
+          "lineNumber": 86
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 6,
+        "functionCount": 5,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "clients/cli/selfagent_cli/main.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 412,
+      "nonEmptyLines": 355,
+      "functions": [
+        {
+          "name": "run_stream",
+          "startLine": 45,
+          "endLine": 105,
+          "params": [
+            "session",
+            "message"
+          ]
+        },
+        {
+          "name": "handle_command",
+          "startLine": 108,
+          "endLine": 178,
+          "params": [
+            "session",
+            "cmd",
+            "args"
+          ]
+        },
+        {
+          "name": "_guarded",
+          "startLine": 181,
+          "endLine": 188,
+          "params": [
+            "coro"
+          ]
+        },
+        {
+          "name": "_do_login",
+          "startLine": 191,
+          "endLine": 218,
+          "params": [
+            "session",
+            "args",
+            "is_register"
+          ]
+        },
+        {
+          "name": "_list_sessions",
+          "startLine": 221,
+          "endLine": 231,
+          "params": [
+            "session"
+          ]
+        },
+        {
+          "name": "_show_history",
+          "startLine": 234,
+          "endLine": 249,
+          "params": [
+            "session"
+          ]
+        },
+        {
+          "name": "_list_tools",
+          "startLine": 252,
+          "endLine": 255,
+          "params": [
+            "session"
+          ]
+        },
+        {
+          "name": "_show_profile",
+          "startLine": 258,
+          "endLine": 265,
+          "params": [
+            "session",
+            "uid"
+          ]
+        },
+        {
+          "name": "_search_memory",
+          "startLine": 268,
+          "endLine": 278,
+          "params": [
+            "session",
+            "query"
+          ]
+        },
+        {
+          "name": "read_input",
+          "startLine": 281,
+          "endLine": 292,
+          "params": []
+        },
+        {
+          "name": "repl",
+          "startLine": 295,
+          "endLine": 344,
+          "params": [
+            "session"
+          ]
+        },
+        {
+          "name": "_parse_args",
+          "startLine": 347,
+          "endLine": 364,
+          "params": [
+            "argv"
+          ]
+        },
+        {
+          "name": "async_main",
+          "startLine": 367,
+          "endLine": 402,
+          "params": []
+        },
+        {
+          "name": "main",
+          "startLine": 405,
+          "endLine": 408,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "run_stream",
+          "line": 45,
+          "isDefault": false
+        },
+        {
+          "name": "handle_command",
+          "line": 108,
+          "isDefault": false
+        },
+        {
+          "name": "_guarded",
+          "line": 181,
+          "isDefault": false
+        },
+        {
+          "name": "_do_login",
+          "line": 191,
+          "isDefault": false
+        },
+        {
+          "name": "_list_sessions",
+          "line": 221,
+          "isDefault": false
+        },
+        {
+          "name": "_show_history",
+          "line": 234,
+          "isDefault": false
+        },
+        {
+          "name": "_list_tools",
+          "line": 252,
+          "isDefault": false
+        },
+        {
+          "name": "_show_profile",
+          "line": 258,
+          "isDefault": false
+        },
+        {
+          "name": "_search_memory",
+          "line": 268,
+          "isDefault": false
+        },
+        {
+          "name": "read_input",
+          "line": 281,
+          "isDefault": false
+        },
+        {
+          "name": "repl",
+          "line": 295,
+          "isDefault": false
+        },
+        {
+          "name": "_parse_args",
+          "line": 347,
+          "isDefault": false
+        },
+        {
+          "name": "async_main",
+          "line": 367,
+          "isDefault": false
+        },
+        {
+          "name": "main",
+          "line": 405,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "run_stream",
+          "callee": "Text",
+          "lineNumber": 47
+        },
+        {
+          "caller": "render",
+          "callee": "parts.append",
+          "lineNumber": 55
+        },
+        {
+          "caller": "render",
+          "callee": "Text",
+          "lineNumber": 55
+        },
+        {
+          "caller": "render",
+          "callee": "\"\\n\".join",
+          "lineNumber": 55
+        },
+        {
+          "caller": "render",
+          "callee": "parts.append",
+          "lineNumber": 56
+        },
+        {
+          "caller": "render",
+          "callee": "Text.assemble",
+          "lineNumber": 57
+        },
+        {
+          "caller": "run_stream",
+          "callee": "Live",
+          "lineNumber": 60
+        },
+        {
+          "caller": "run_stream",
+          "callee": "render",
+          "lineNumber": 60
+        },
+        {
+          "caller": "run_stream",
+          "callee": "stream_chat",
+          "lineNumber": 61
+        },
+        {
+          "caller": "run_stream",
+          "callee": "event.get",
+          "lineNumber": 64
+        },
+        {
+          "caller": "run_stream",
+          "callee": "full_text.append",
+          "lineNumber": 66
+        },
+        {
+          "caller": "run_stream",
+          "callee": "event.get",
+          "lineNumber": 66
+        },
+        {
+          "caller": "run_stream",
+          "callee": "live.update",
+          "lineNumber": 67
+        },
+        {
+          "caller": "run_stream",
+          "callee": "render",
+          "lineNumber": 67
+        },
+        {
+          "caller": "run_stream",
+          "callee": "c.get",
+          "lineNumber": 69
+        },
+        {
+          "caller": "run_stream",
+          "callee": "event.get",
+          "lineNumber": 69
+        },
+        {
+          "caller": "run_stream",
+          "callee": "tool_lines.append",
+          "lineNumber": 70
+        },
+        {
+          "caller": "run_stream",
+          "callee": "', '.join",
+          "lineNumber": 70
+        },
+        {
+          "caller": "run_stream",
+          "callee": "live.update",
+          "lineNumber": 71
+        },
+        {
+          "caller": "run_stream",
+          "callee": "render",
+          "lineNumber": 71
+        },
+        {
+          "caller": "run_stream",
+          "callee": "tool_lines.append",
+          "lineNumber": 73
+        },
+        {
+          "caller": "run_stream",
+          "callee": "event.get",
+          "lineNumber": 73
+        },
+        {
+          "caller": "run_stream",
+          "callee": "live.update",
+          "lineNumber": 74
+        },
+        {
+          "caller": "run_stream",
+          "callee": "render",
+          "lineNumber": 74
+        },
+        {
+          "caller": "run_stream",
+          "callee": "event.get",
+          "lineNumber": 76
+        },
+        {
+          "caller": "run_stream",
+          "callee": "tool_lines.append",
+          "lineNumber": 77
+        },
+        {
+          "caller": "run_stream",
+          "callee": "event.get",
+          "lineNumber": 77
+        },
+        {
+          "caller": "run_stream",
+          "callee": "live.update",
+          "lineNumber": 78
+        },
+        {
+          "caller": "run_stream",
+          "callee": "render",
+          "lineNumber": 78
+        },
+        {
+          "caller": "run_stream",
+          "callee": "event.get",
+          "lineNumber": 80
+        },
+        {
+          "caller": "run_stream",
+          "callee": "str",
+          "lineNumber": 80
+        },
+        {
+          "caller": "run_stream",
+          "callee": "full_text.append",
+          "lineNumber": 81
+        },
+        {
+          "caller": "run_stream",
+          "callee": "live.update",
+          "lineNumber": 82
+        },
+        {
+          "caller": "run_stream",
+          "callee": "render",
+          "lineNumber": 82
+        },
+        {
+          "caller": "run_stream",
+          "callee": "tool_lines.append",
+          "lineNumber": 84
+        },
+        {
+          "caller": "run_stream",
+          "callee": "event.get",
+          "lineNumber": 84
+        },
+        {
+          "caller": "run_stream",
+          "callee": "live.update",
+          "lineNumber": 85
+        },
+        {
+          "caller": "run_stream",
+          "callee": "render",
+          "lineNumber": 85
+        },
+        {
+          "caller": "run_stream",
+          "callee": "console.print",
+          "lineNumber": 87
+        },
+        {
+          "caller": "run_stream",
+          "callee": "console.print",
+          "lineNumber": 88
+        },
+        {
+          "caller": "run_stream",
+          "callee": "console.print",
+          "lineNumber": 92
+        },
+        {
+          "caller": "run_stream",
+          "callee": "console.print",
+          "lineNumber": 93
+        },
+        {
+          "caller": "run_stream",
+          "callee": "console.print",
+          "lineNumber": 95
+        },
+        {
+          "caller": "run_stream",
+          "callee": "console.print",
+          "lineNumber": 97
+        },
+        {
+          "caller": "run_stream",
+          "callee": "str(full_text).strip",
+          "lineNumber": 100
+        },
+        {
+          "caller": "run_stream",
+          "callee": "str",
+          "lineNumber": 100
+        },
+        {
+          "caller": "run_stream",
+          "callee": "console.print",
+          "lineNumber": 101
+        },
+        {
+          "caller": "run_stream",
+          "callee": "console.print",
+          "lineNumber": 103
+        },
+        {
+          "caller": "run_stream",
+          "callee": "Markdown",
+          "lineNumber": 103
+        },
+        {
+          "caller": "run_stream",
+          "callee": "str",
+          "lineNumber": 103
+        },
+        {
+          "caller": "run_stream",
+          "callee": "console.print",
+          "lineNumber": 105
+        },
+        {
+          "caller": "handle_command",
+          "callee": "console.print",
+          "lineNumber": 111
+        },
+        {
+          "caller": "handle_command",
+          "callee": "console.print",
+          "lineNumber": 114
+        },
+        {
+          "caller": "handle_command",
+          "callee": "Panel",
+          "lineNumber": 114
+        },
+        {
+          "caller": "handle_command",
+          "callee": "_do_login",
+          "lineNumber": 133
+        },
+        {
+          "caller": "handle_command",
+          "callee": "_do_login",
+          "lineNumber": 135
+        },
+        {
+          "caller": "handle_command",
+          "callee": "session.logout",
+          "lineNumber": 137
+        },
+        {
+          "caller": "handle_command",
+          "callee": "console.print",
+          "lineNumber": 138
+        },
+        {
+          "caller": "handle_command",
+          "callee": "session.reset_thread",
+          "lineNumber": 140
+        },
+        {
+          "caller": "handle_command",
+          "callee": "console.print",
+          "lineNumber": 141
+        },
+        {
+          "caller": "handle_command",
+          "callee": "_guarded",
+          "lineNumber": 143
+        },
+        {
+          "caller": "handle_command",
+          "callee": "_list_sessions",
+          "lineNumber": 143
+        },
+        {
+          "caller": "handle_command",
+          "callee": "console.print",
+          "lineNumber": 146
+        },
+        {
+          "caller": "handle_command",
+          "callee": "console.print",
+          "lineNumber": 149
+        },
+        {
+          "caller": "handle_command",
+          "callee": "_guarded",
+          "lineNumber": 150
+        },
+        {
+          "caller": "handle_command",
+          "callee": "_show_history",
+          "lineNumber": 150
+        },
+        {
+          "caller": "handle_command",
+          "callee": "_guarded",
+          "lineNumber": 152
+        },
+        {
+          "caller": "handle_command",
+          "callee": "_show_history",
+          "lineNumber": 152
+        },
+        {
+          "caller": "handle_command",
+          "callee": "console.print",
+          "lineNumber": 156
+        },
+        {
+          "caller": "handle_command",
+          "callee": "console.print",
+          "lineNumber": 158
+        },
+        {
+          "caller": "handle_command",
+          "callee": "console.print",
+          "lineNumber": 160
+        },
+        {
+          "caller": "handle_command",
+          "callee": "console.print",
+          "lineNumber": 163
+        },
+        {
+          "caller": "handle_command",
+          "callee": "console.print",
+          "lineNumber": 164
+        },
+        {
+          "caller": "handle_command",
+          "callee": "console.print",
+          "lineNumber": 165
+        },
+        {
+          "caller": "handle_command",
+          "callee": "_guarded",
+          "lineNumber": 167
+        },
+        {
+          "caller": "handle_command",
+          "callee": "_list_tools",
+          "lineNumber": 167
+        },
+        {
+          "caller": "handle_command",
+          "callee": "_guarded",
+          "lineNumber": 170
+        },
+        {
+          "caller": "handle_command",
+          "callee": "_show_profile",
+          "lineNumber": 170
+        },
+        {
+          "caller": "handle_command",
+          "callee": "console.print",
+          "lineNumber": 173
+        },
+        {
+          "caller": "handle_command",
+          "callee": "_guarded",
+          "lineNumber": 175
+        },
+        {
+          "caller": "handle_command",
+          "callee": "_search_memory",
+          "lineNumber": 175
+        },
+        {
+          "caller": "handle_command",
+          "callee": "\" \".join",
+          "lineNumber": 175
+        },
+        {
+          "caller": "handle_command",
+          "callee": "console.print",
+          "lineNumber": 177
+        },
+        {
+          "caller": "_guarded",
+          "callee": "console.print",
+          "lineNumber": 186
+        },
+        {
+          "caller": "_guarded",
+          "callee": "console.print",
+          "lineNumber": 188
+        },
+        {
+          "caller": "_do_login",
+          "callee": "console.input(\"用户名: \").strip",
+          "lineNumber": 196
+        },
+        {
+          "caller": "_do_login",
+          "callee": "console.input",
+          "lineNumber": 196
+        },
+        {
+          "caller": "_do_login",
+          "callee": "console.print",
+          "lineNumber": 198
+        },
+        {
+          "caller": "_do_login",
+          "callee": "getpass.getpass",
+          "lineNumber": 201
+        },
+        {
+          "caller": "_do_login",
+          "callee": "console.print",
+          "lineNumber": 203
+        },
+        {
+          "caller": "_do_login",
+          "callee": "console.print",
+          "lineNumber": 206
+        },
+        {
+          "caller": "_do_login",
+          "callee": "fn",
+          "lineNumber": 211
+        },
+        {
+          "caller": "_do_login",
+          "callee": "console.print",
+          "lineNumber": 213
+        },
+        {
+          "caller": "_do_login",
+          "callee": "session.set_auth",
+          "lineNumber": 216
+        },
+        {
+          "caller": "_do_login",
+          "callee": "data.get",
+          "lineNumber": 216
+        },
+        {
+          "caller": "_do_login",
+          "callee": "console.print",
+          "lineNumber": 217
+        },
+        {
+          "caller": "_do_login",
+          "callee": "console.print",
+          "lineNumber": 218
+        },
+        {
+          "caller": "_list_sessions",
+          "callee": "get_json",
+          "lineNumber": 222
+        },
+        {
+          "caller": "_list_sessions",
+          "callee": "data.get",
+          "lineNumber": 223
+        },
+        {
+          "caller": "_list_sessions",
+          "callee": "console.print",
+          "lineNumber": 225
+        },
+        {
+          "caller": "_list_sessions",
+          "callee": "console.print",
+          "lineNumber": 229
+        },
+        {
+          "caller": "_list_sessions",
+          "callee": "s.get",
+          "lineNumber": 229
+        },
+        {
+          "caller": "_list_sessions",
+          "callee": "s.get",
+          "lineNumber": 230
+        },
+        {
+          "caller": "_list_sessions",
+          "callee": "console.print",
+          "lineNumber": 231
+        },
+        {
+          "caller": "_show_history",
+          "callee": "get_json",
+          "lineNumber": 236
+        },
+        {
+          "caller": "_show_history",
+          "callee": "data.get",
+          "lineNumber": 239
+        },
+        {
+          "caller": "_show_history",
+          "callee": "console.print",
+          "lineNumber": 241
+        },
+        {
+          "caller": "_show_history",
+          "callee": "ev.get",
+          "lineNumber": 245
+        },
+        {
+          "caller": "_show_history",
+          "callee": "console.print",
+          "lineNumber": 246
+        },
+        {
+          "caller": "_show_history",
+          "callee": "ev.get",
+          "lineNumber": 247
+        },
+        {
+          "caller": "_show_history",
+          "callee": "console.print",
+          "lineNumber": 248
+        },
+        {
+          "caller": "_show_history",
+          "callee": "console.print",
+          "lineNumber": 249
+        },
+        {
+          "caller": "_list_tools",
+          "callee": "get_json",
+          "lineNumber": 253
+        },
+        {
+          "caller": "_list_tools",
+          "callee": "data.get",
+          "lineNumber": 254
+        },
+        {
+          "caller": "_list_tools",
+          "callee": "console.print",
+          "lineNumber": 255
+        },
+        {
+          "caller": "_list_tools",
+          "callee": "t.get",
+          "lineNumber": 255
+        },
+        {
+          "caller": "_show_profile",
+          "callee": "get_json",
+          "lineNumber": 259
+        },
+        {
+          "caller": "_show_profile",
+          "callee": "console.print",
+          "lineNumber": 260
+        },
+        {
+          "caller": "_show_profile",
+          "callee": "Panel",
+          "lineNumber": 260
+        },
+        {
+          "caller": "_show_profile",
+          "callee": "data.get",
+          "lineNumber": 261
+        },
+        {
+          "caller": "_show_profile",
+          "callee": "data.get",
+          "lineNumber": 262
+        },
+        {
+          "caller": "_show_profile",
+          "callee": "data.get",
+          "lineNumber": 263
+        },
+        {
+          "caller": "_search_memory",
+          "callee": "get_json",
+          "lineNumber": 270
+        },
+        {
+          "caller": "_search_memory",
+          "callee": "data.get",
+          "lineNumber": 274
+        },
+        {
+          "caller": "_search_memory",
+          "callee": "console.print",
+          "lineNumber": 276
+        },
+        {
+          "caller": "_search_memory",
+          "callee": "console.print",
+          "lineNumber": 278
+        },
+        {
+          "caller": "_search_memory",
+          "callee": "m.get",
+          "lineNumber": 278
+        },
+        {
+          "caller": "read_input",
+          "callee": "hasattr",
+          "lineNumber": 287
+        },
+        {
+          "caller": "read_input",
+          "callee": "InMemoryHistory",
+          "lineNumber": 288
+        },
+        {
+          "caller": "read_input",
+          "callee": "pt_prompt",
+          "lineNumber": 289
+        },
+        {
+          "caller": "read_input",
+          "callee": "input",
+          "lineNumber": 292
+        },
+        {
+          "caller": "repl",
+          "callee": "console.print",
+          "lineNumber": 297
+        },
+        {
+          "caller": "repl",
+          "callee": "get_json",
+          "lineNumber": 300
+        },
+        {
+          "caller": "repl",
+          "callee": "console.print",
+          "lineNumber": 301
+        },
+        {
+          "caller": "repl",
+          "callee": "h.get",
+          "lineNumber": 301
+        },
+        {
+          "caller": "repl",
+          "callee": "h.get",
+          "lineNumber": 301
+        },
+        {
+          "caller": "repl",
+          "callee": "h.get",
+          "lineNumber": 301
+        },
+        {
+          "caller": "repl",
+          "callee": "console.print",
+          "lineNumber": 303
+        },
+        {
+          "caller": "repl",
+          "callee": "get_json",
+          "lineNumber": 308
+        },
+        {
+          "caller": "repl",
+          "callee": "console.print",
+          "lineNumber": 310
+        },
+        {
+          "caller": "repl",
+          "callee": "console.print",
+          "lineNumber": 312
+        },
+        {
+          "caller": "repl",
+          "callee": "console.print",
+          "lineNumber": 314
+        },
+        {
+          "caller": "repl",
+          "callee": "console.print",
+          "lineNumber": 315
+        },
+        {
+          "caller": "repl",
+          "callee": "console.print",
+          "lineNumber": 316
+        },
+        {
+          "caller": "repl",
+          "callee": "console.print",
+          "lineNumber": 318
+        },
+        {
+          "caller": "repl",
+          "callee": "read_input().strip",
+          "lineNumber": 322
+        },
+        {
+          "caller": "repl",
+          "callee": "read_input",
+          "lineNumber": 322
+        },
+        {
+          "caller": "repl",
+          "callee": "console.print",
+          "lineNumber": 324
+        },
+        {
+          "caller": "repl",
+          "callee": "user_input.startswith",
+          "lineNumber": 331
+        },
+        {
+          "caller": "repl",
+          "callee": "user_input[1:].split",
+          "lineNumber": 332
+        },
+        {
+          "caller": "repl",
+          "callee": "handle_command",
+          "lineNumber": 335
+        },
+        {
+          "caller": "repl",
+          "callee": "console.print",
+          "lineNumber": 338
+        },
+        {
+          "caller": "repl",
+          "callee": "console.print",
+          "lineNumber": 342
+        },
+        {
+          "caller": "repl",
+          "callee": "run_stream",
+          "lineNumber": 343
+        },
+        {
+          "caller": "repl",
+          "callee": "console.print",
+          "lineNumber": 344
+        },
+        {
+          "caller": "_parse_args",
+          "callee": "argparse.ArgumentParser",
+          "lineNumber": 348
+        },
+        {
+          "caller": "_parse_args",
+          "callee": "parser.add_argument",
+          "lineNumber": 352
+        },
+        {
+          "caller": "_parse_args",
+          "callee": "parser.add_argument",
+          "lineNumber": 353
+        },
+        {
+          "caller": "_parse_args",
+          "callee": "parser.add_argument",
+          "lineNumber": 354
+        },
+        {
+          "caller": "_parse_args",
+          "callee": "parser.add_argument",
+          "lineNumber": 358
+        },
+        {
+          "caller": "_parse_args",
+          "callee": "parser.add_argument",
+          "lineNumber": 362
+        },
+        {
+          "caller": "_parse_args",
+          "callee": "parser.parse_known_args",
+          "lineNumber": 364
+        },
+        {
+          "caller": "async_main",
+          "callee": "_parse_args",
+          "lineNumber": 368
+        },
+        {
+          "caller": "async_main",
+          "callee": "Session",
+          "lineNumber": 372
+        },
+        {
+          "caller": "async_main",
+          "callee": "args.remote.rstrip",
+          "lineNumber": 374
+        },
+        {
+          "caller": "async_main",
+          "callee": "run_stream",
+          "lineNumber": 376
+        },
+        {
+          "caller": "async_main",
+          "callee": "\" \".join",
+          "lineNumber": 376
+        },
+        {
+          "caller": "async_main",
+          "callee": "repl",
+          "lineNumber": 378
+        },
+        {
+          "caller": "async_main",
+          "callee": "bootstrap",
+          "lineNumber": 386
+        },
+        {
+          "caller": "async_main",
+          "callee": "setup_agent",
+          "lineNumber": 389
+        },
+        {
+          "caller": "async_main",
+          "callee": "console.print",
+          "lineNumber": 391
+        },
+        {
+          "caller": "async_main",
+          "callee": "run_local_once",
+          "lineNumber": 398
+        },
+        {
+          "caller": "async_main",
+          "callee": "\" \".join",
+          "lineNumber": 398
+        },
+        {
+          "caller": "async_main",
+          "callee": "run_local_repl",
+          "lineNumber": 400
+        },
+        {
+          "caller": "async_main",
+          "callee": "shutdown_agent",
+          "lineNumber": 402
+        },
+        {
+          "caller": "main",
+          "callee": "contextlib.suppress",
+          "lineNumber": 407
+        },
+        {
+          "caller": "main",
+          "callee": "asyncio.run",
+          "lineNumber": 408
+        },
+        {
+          "caller": "main",
+          "callee": "async_main",
+          "lineNumber": 408
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 14,
+        "functionCount": 14,
+        "classCount": 0
+      }
+    }
+  ]
+}

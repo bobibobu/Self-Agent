@@ -1,0 +1,309 @@
+{
+  "nodes": [
+    {
+      "id": "file:tests/test_local_mode.py",
+      "type": "file",
+      "name": "test_local_mode.py",
+      "filePath": "tests/test_local_mode.py",
+      "summary": "Tests CLI local mode: SQLite single-file storage, the full approval-interrupt round-trip, and the contract that the agent event stream must be fully consumed before resume (early break silently loses the interrupt).",
+      "tags": ["test", "local-mode", "sqlite", "approval-flow", "regression-guard"],
+      "complexity": "complex",
+      "languageNotes": "Uses pytest async markers plus monkeypatching of the LLM client and singleton checkpointer reset to isolate each workspace."
+    },
+    {
+      "id": "class:tests/test_local_mode.py:TestApprovalRoundTrip",
+      "type": "class",
+      "name": "TestApprovalRoundTrip",
+      "filePath": "tests/test_local_mode.py",
+      "lineRange": [141, 227],
+      "summary": "End-to-end approval tests asserting writes are held until approved, denied on reject, no done event while awaiting approval, and that breaking early on approval_required loses the interrupt (regression guard).",
+      "tags": ["test", "approval-flow", "async", "regression-guard"],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:tests/test_local_mode.py:TestLocalBootstrap",
+      "type": "class",
+      "name": "TestLocalBootstrap",
+      "filePath": "tests/test_local_mode.py",
+      "lineRange": [230, 251],
+      "summary": "Verifies local-mode bootstrap presets a no-database environment (SQLite backend, auth off, A2A off) while still respecting explicitly set env vars.",
+      "tags": ["test", "bootstrap", "environment", "local-mode"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:tests/test_plan.py",
+      "type": "file",
+      "name": "test_plan.py",
+      "filePath": "tests/test_plan.py",
+      "summary": "Tests the task-planning external scratchpad: strict validation of model-supplied plan steps, and that the plan actually lands in graph state and survives the checkpointer rather than only appearing in a message.",
+      "tags": ["test", "plan", "validation", "graph-state", "persistence"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:tests/test_plan.py:TestNormalize",
+      "type": "class",
+      "name": "TestNormalize",
+      "filePath": "tests/test_plan.py",
+      "lineRange": [23, 74],
+      "summary": "Validation tests asserting normalize accepts well-formed and plain-string plans, rejects multiple in-progress steps and malformed input, and produces actionable error messages.",
+      "tags": ["test", "validation", "plan", "error-messages"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:tests/test_plan.py:TestPlanReachesGraphState",
+      "type": "class",
+      "name": "TestPlanReachesGraphState",
+      "filePath": "tests/test_plan.py",
+      "lineRange": [114, 216],
+      "summary": "Integration tests asserting the plan merges into graph state via tools_node, emits plan_updated events, replaces (not appends) in the reducer, and survives checkpoint persistence across turns.",
+      "tags": ["test", "graph-state", "persistence", "integration"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:tests/test_sandbox.py",
+      "type": "file",
+      "name": "test_sandbox.py",
+      "filePath": "tests/test_sandbox.py",
+      "summary": "Tests the command sandbox by asserting actual interception behavior (not config correctness): workspace stays usable while outside-workspace reads/writes are blocked, plus bwrap argv construction and private-tmp isolation.",
+      "tags": ["test", "sandbox", "security", "isolation", "bwrap"],
+      "complexity": "moderate",
+      "languageNotes": "Guards against the most dangerous sandbox failure mode (looks enabled but is a no-op) by actually reading/writing paths outside the workspace."
+    },
+    {
+      "id": "class:tests/test_sandbox.py:TestBackendDetection",
+      "type": "class",
+      "name": "TestBackendDetection",
+      "filePath": "tests/test_sandbox.py",
+      "lineRange": [74, 118],
+      "summary": "Tests that backend detection is capability-based (verified by actually running, not by binary/ABI presence), honest about no protection, and correctly scopes Landlock claims to filesystem only.",
+      "tags": ["test", "sandbox", "capability-detection", "honest-reporting"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:tests/test_sandbox.py:TestActualIsolation",
+      "type": "class",
+      "name": "TestActualIsolation",
+      "filePath": "tests/test_sandbox.py",
+      "lineRange": [125, 166],
+      "summary": "Live interception tests (skipped without a backend) proving workspace I/O works while outside-workspace file reads and writes are blocked, and that command output reports the active backend.",
+      "tags": ["test", "sandbox", "isolation", "security", "integration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:tests/test_telemetry.py",
+      "type": "file",
+      "name": "test_telemetry.py",
+      "filePath": "tests/test_telemetry.py",
+      "summary": "Tests OpenTelemetry tracing by capturing real spans with an in-memory exporter and asserting the span tree shape (parent/child nesting and shared trace id) rather than mere instrumentation presence.",
+      "tags": ["test", "telemetry", "opentelemetry", "tracing", "span-tree"],
+      "complexity": "complex",
+      "languageNotes": "Works around OpenTelemetry's set-once provider restriction by swapping the internal _TRACER_PROVIDER reference, and locks down span-across-yield behavior that PEP 568 leaves undefined."
+    },
+    {
+      "id": "class:tests/test_telemetry.py:TestRunAgentTracing",
+      "type": "class",
+      "name": "TestRunAgentTracing",
+      "filePath": "tests/test_telemetry.py",
+      "lineRange": [94, 186],
+      "summary": "Non-streaming tracing tests asserting agent.turn span-tree structure, GenAI attributes and token usage on chat spans, one chat span per turn, nested tool spans, and error status on failed turns.",
+      "tags": ["test", "telemetry", "span-tree", "genai-attributes", "error-handling"],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:tests/test_telemetry.py:TestStreamAgentTracing",
+      "type": "class",
+      "name": "TestStreamAgentTracing",
+      "filePath": "tests/test_telemetry.py",
+      "lineRange": [192, 229],
+      "summary": "Streaming tracing tests asserting spans survive async-generator yields (children stay nested under agent.turn rather than flattening to roots) and that all spans in a turn share one trace id.",
+      "tags": ["test", "telemetry", "streaming", "async-generator", "trace-correlation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:tests/test_regressions.py",
+      "type": "file",
+      "name": "test_regressions.py",
+      "filePath": "tests/test_regressions.py",
+      "summary": "Regression suite for silent-failure and authorization bugs: test isolation (blackhole DBs), LangGraph persistence API usage, RAG delete/namespace/context wrapping, tenant authorization, prompt accumulation, single-LLM-call-per-turn, and tool-node truncation/concurrency.",
+      "tags": ["test", "regression", "authorization", "persistence", "rag"],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:tests/test_regressions.py:TestAuthzRegressions",
+      "type": "class",
+      "name": "TestAuthzRegressions",
+      "filePath": "tests/test_regressions.py",
+      "lineRange": [172, 242],
+      "summary": "Authorization regressions: request bodies carry no tenant_id, tenant resolution rejects unlisted tenants and ignores client headers when multi-tenant is off, session ops take an owner filter, admin role is encoded in the JWT, and admin-only endpoints declare require_admin.",
+      "tags": ["test", "authorization", "multi-tenant", "security", "regression"],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:tests/test_regressions.py:TestRagRegressions",
+      "type": "class",
+      "name": "TestRagRegressions",
+      "filePath": "tests/test_regressions.py",
+      "lineRange": [129, 166],
+      "summary": "RAG regressions: delete_kb actually deletes indexed chunks, knowledge-base namespaces are tenant-scoped under multi-tenant mode, and retrieved context wraps untrusted content with explicit document boundaries.",
+      "tags": ["test", "rag", "multi-tenant", "prompt-injection", "regression"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:tests/test_unit.py",
+      "type": "file",
+      "name": "test_unit.py",
+      "filePath": "tests/test_unit.py",
+      "summary": "Fast pure-logic unit tests with no DB/LLM/network dependencies: calculator safe evaluation, time tool, tool registry, LLM message-format conversions, in-memory store, profile fallback, config parsing, skills, security, auth, multi-tenant namespacing, RAG chunking, cost estimation, and rate-limit identity.",
+      "tags": ["test", "unit", "pure-logic", "broad-coverage"],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:tests/test_unit.py:TestCalculator",
+      "type": "class",
+      "name": "TestCalculator",
+      "filePath": "tests/test_unit.py",
+      "lineRange": [29, 63],
+      "summary": "Unit tests for the calculator tool's safe-expression evaluation: arithmetic, power, functions, negative numbers, invalid-expression rejection, and division-by-zero handling.",
+      "tags": ["test", "calculator", "safe-eval", "unit"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:tests/test_unit.py:TestAuth",
+      "type": "class",
+      "name": "TestAuth",
+      "filePath": "tests/test_unit.py",
+      "lineRange": [330, 369],
+      "summary": "Unit tests for authentication primitives: password hash/verify round-trip and uniqueness, JWT create/decode, invalid-token rejection, and safe truncation of over-long passwords.",
+      "tags": ["test", "auth", "password-hashing", "jwt", "unit"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:tests/test_local_mode.py",
+      "target": "class:tests/test_local_mode.py:TestApprovalRoundTrip",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:tests/test_local_mode.py",
+      "target": "class:tests/test_local_mode.py:TestLocalBootstrap",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:tests/test_plan.py",
+      "target": "class:tests/test_plan.py:TestNormalize",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:tests/test_plan.py",
+      "target": "class:tests/test_plan.py:TestPlanReachesGraphState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:tests/test_regressions.py",
+      "target": "class:tests/test_regressions.py:TestAuthzRegressions",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:tests/test_regressions.py",
+      "target": "class:tests/test_regressions.py:TestRagRegressions",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:tests/test_sandbox.py",
+      "target": "class:tests/test_sandbox.py:TestBackendDetection",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:tests/test_sandbox.py",
+      "target": "class:tests/test_sandbox.py:TestActualIsolation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:tests/test_telemetry.py",
+      "target": "class:tests/test_telemetry.py:TestRunAgentTracing",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:tests/test_telemetry.py",
+      "target": "class:tests/test_telemetry.py:TestStreamAgentTracing",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:tests/test_unit.py",
+      "target": "class:tests/test_unit.py:TestCalculator",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:tests/test_unit.py",
+      "target": "class:tests/test_unit.py:TestAuth",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:clients/cli/selfagent_cli/local.py",
+      "target": "file:tests/test_local_mode.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:app/agent/plan.py",
+      "target": "file:tests/test_plan.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:app/sandbox.py",
+      "target": "file:tests/test_sandbox.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:app/core/telemetry.py",
+      "target": "file:tests/test_telemetry.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:app/agent/graph.py",
+      "target": "file:tests/test_regressions.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:app/agent/tools/__init__.py",
+      "target": "file:tests/test_unit.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

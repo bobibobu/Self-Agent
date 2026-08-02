@@ -1,0 +1,149 @@
+{
+  "nodes": [
+    {
+      "id": "file:clients/web/src/App.jsx",
+      "type": "file",
+      "name": "App.jsx",
+      "filePath": "clients/web/src/App.jsx",
+      "summary": "Top-level application shell. The App component gates on authentication and renders either Login or ChatApp; ChatApp is the full chat UI that manages sessions, messages, tool steps, health polling, and SSE streaming consumption.",
+      "tags": ["entry-point", "component", "chat", "sse-streaming", "state-management"],
+      "complexity": "complex",
+      "languageNotes": "Single 250-line ChatApp component using many useState/useEffect hooks to orchestrate sessions, streaming, and tool-step rendering rather than splitting into smaller components."
+    },
+    {
+      "id": "file:clients/web/src/Login.jsx",
+      "type": "file",
+      "name": "Login.jsx",
+      "filePath": "clients/web/src/Login.jsx",
+      "summary": "Login and registration page component with a username/password form, mode toggle between login and register, loading/error states, and delegation to the api.js auth helpers.",
+      "tags": ["component", "auth", "login", "form", "event-handler"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:clients/web/src/api.js",
+      "type": "file",
+      "name": "api.js",
+      "filePath": "clients/web/src/api.js",
+      "summary": "HTTP and SSE client layer for the FastAPI backend. Manages JWT auth tokens in localStorage and exposes fetch wrappers for every backend endpoint (auth, chat, sessions, history, tools, health), including a manual ReadableStream-based SSE parser for streaming chat.",
+      "tags": ["api-handler", "service", "auth", "sse-streaming", "serialization"],
+      "complexity": "complex",
+      "languageNotes": "Uses fetch + ReadableStream.getReader() + TextDecoder for SSE parsing instead of EventSource, allowing POST requests with Authorization headers for streaming chat."
+    },
+    {
+      "id": "file:clients/web/src/main.jsx",
+      "type": "file",
+      "name": "main.jsx",
+      "filePath": "clients/web/src/main.jsx",
+      "summary": "React entry point that mounts the App component into the #root DOM node via ReactDOM.createRoot.",
+      "tags": ["entry-point", "react-root", "bootstrap"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:clients/web/src/App.jsx:App",
+      "type": "function",
+      "name": "App",
+      "filePath": "clients/web/src/App.jsx",
+      "lineRange": [11, 17],
+      "summary": "Top-level auth-gate component that checks login state and conditionally renders the Login screen or the ChatApp workspace, wiring logout to clearAuth.",
+      "tags": ["component", "auth-gate", "entry-point"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:clients/web/src/App.jsx:ChatApp",
+      "type": "function",
+      "name": "ChatApp",
+      "filePath": "clients/web/src/App.jsx",
+      "lineRange": [19, 270],
+      "summary": "Main chat workspace component. Manages thread/session list, message state, tool-step rendering, connection health, and the full send loop that consumes the SSE stream from streamChat and progressively updates the assistant message.",
+      "tags": ["component", "chat", "sse-streaming", "state-management", "event-handler"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:clients/web/src/Login.jsx:Login",
+      "type": "function",
+      "name": "Login",
+      "filePath": "clients/web/src/Login.jsx",
+      "lineRange": [4, 79],
+      "summary": "Login/register form component with mode toggle, input validation, loading and error states, and submission that calls the api.js login or register helpers and propagates auth success via onAuthed.",
+      "tags": ["component", "auth", "form", "login", "event-handler"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:clients/web/src/api.js:authRequest",
+      "type": "function",
+      "name": "authRequest",
+      "filePath": "clients/web/src/api.js",
+      "lineRange": [60, 70],
+      "summary": "Central authenticated POST helper used by login and register. Sends a JSON body with the Bearer token, normalizes error messages, and persists returned auth credentials on success.",
+      "tags": ["api-handler", "auth", "fetch-wrapper"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:clients/web/src/api.js:streamChat",
+      "type": "function",
+      "name": "streamChat",
+      "filePath": "clients/web/src/api.js",
+      "lineRange": [87, 130],
+      "summary": "Opens a streaming POST to /api/chat and reads the SSE response body via a ReadableStream reader, buffering text, splitting on block boundaries, parsing each block via parseSSEBlock, and forwarding structured events to the onEvent callback. Clears auth and throws on 401.",
+      "tags": ["sse-streaming", "api-handler", "chat", "streaming"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:clients/web/src/api.js:parseSSEBlock",
+      "type": "function",
+      "name": "parseSSEBlock",
+      "filePath": "clients/web/src/api.js",
+      "lineRange": [133, 160],
+      "summary": "Parses a single SSE event block by walking its field lines, collecting data: lines, and JSON-parsing the concatenated data payload into a structured {type, data} event object.",
+      "tags": ["sse", "parser", "serialization"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:clients/web/src/api.js:chat",
+      "type": "function",
+      "name": "chat",
+      "filePath": "clients/web/src/api.js",
+      "lineRange": [162, 171],
+      "summary": "Non-streaming POST to /api/chat returning the assistant response JSON; clears local auth on 401 Unauthorized.",
+      "tags": ["api-handler", "chat", "fetch-wrapper"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:clients/web/src/api.js:getHistory",
+      "type": "function",
+      "name": "getHistory",
+      "filePath": "clients/web/src/api.js",
+      "lineRange": [221, 236],
+      "summary": "Fetches a thread's message history from /api/history and reconstructs it into ordered user/assistant message objects suitable for direct rendering in the chat view.",
+      "tags": ["api-handler", "history", "data-mapping"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    { "source": "file:clients/web/src/App.jsx", "target": "file:clients/web/src/App.css", "type": "imports", "direction": "forward", "weight": 0.7 },
+    { "source": "file:clients/web/src/App.jsx", "target": "file:clients/web/src/Login.jsx", "type": "imports", "direction": "forward", "weight": 0.7 },
+    { "source": "file:clients/web/src/App.jsx", "target": "file:clients/web/src/api.js", "type": "imports", "direction": "forward", "weight": 0.7 },
+    { "source": "file:clients/web/src/Login.jsx", "target": "file:clients/web/src/api.js", "type": "imports", "direction": "forward", "weight": 0.7 },
+    { "source": "file:clients/web/src/main.jsx", "target": "file:clients/web/src/App.jsx", "type": "imports", "direction": "forward", "weight": 0.7 },
+    { "source": "file:clients/web/src/main.jsx", "target": "file:clients/web/src/index.css", "type": "imports", "direction": "forward", "weight": 0.7 },
+
+    { "source": "file:clients/web/src/App.jsx", "target": "function:clients/web/src/App.jsx:App", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:clients/web/src/App.jsx", "target": "function:clients/web/src/App.jsx:ChatApp", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:clients/web/src/Login.jsx", "target": "function:clients/web/src/Login.jsx:Login", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:clients/web/src/api.js", "target": "function:clients/web/src/api.js:authRequest", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:clients/web/src/api.js", "target": "function:clients/web/src/api.js:streamChat", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:clients/web/src/api.js", "target": "function:clients/web/src/api.js:parseSSEBlock", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:clients/web/src/api.js", "target": "function:clients/web/src/api.js:chat", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:clients/web/src/api.js", "target": "function:clients/web/src/api.js:getHistory", "type": "contains", "direction": "forward", "weight": 1.0 },
+
+    { "source": "file:clients/web/src/App.jsx", "target": "function:clients/web/src/App.jsx:App", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:clients/web/src/Login.jsx", "target": "function:clients/web/src/Login.jsx:Login", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:clients/web/src/api.js", "target": "function:clients/web/src/api.js:streamChat", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:clients/web/src/api.js", "target": "function:clients/web/src/api.js:chat", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:clients/web/src/api.js", "target": "function:clients/web/src/api.js:getHistory", "type": "exports", "direction": "forward", "weight": 0.8 },
+
+    { "source": "function:clients/web/src/api.js:streamChat", "target": "function:clients/web/src/api.js:parseSSEBlock", "type": "calls", "direction": "forward", "weight": 0.8 },
+    { "source": "function:clients/web/src/App.jsx:ChatApp", "target": "function:clients/web/src/api.js:streamChat", "type": "calls", "direction": "forward", "weight": 0.8 },
+    { "source": "function:clients/web/src/App.jsx:ChatApp", "target": "function:clients/web/src/api.js:getHistory", "type": "calls", "direction": "forward", "weight": 0.8 }
+  ]
+}

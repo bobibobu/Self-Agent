@@ -1,0 +1,9 @@
+{
+  "projectRoot": "e:/AIwork/Self-Agent",
+  "batchFiles": [
+    {"path": "infra/postgres/migrations/001_fix_conversations_schema.sql", "language": "sql", "sizeLines": 41, "fileCategory": "data"}
+  ],
+  "batchImportData": {
+    "infra/postgres/migrations/001_fix_conversations_schema.sql": []
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "nodes": [
+    {
+      "id": "config:.env.example",
+      "type": "config",
+      "name": ".env.example",
+      "filePath": ".env.example",
+      "summary": "Canonical environment-variable template (67 settings) covering app runtime, OpenTelemetry tracing, multi-provider LLM keys (GLM/OpenAI/Anthropic), embeddings, agent limits, workspace/tool approval, command sandbox, and Postgres/Mongo/Redis/Neo4j DSNs, plus JWT auth, multi-tenancy, rate limiting, uploads, and Hermes learning flags. Each variable maps 1:1 to a field on app/core/config.py:Settings.",
+      "tags": ["configuration", "environment", "secrets-template", "settings", "observability"],
+      "complexity": "complex",
+      "languageNotes": "Grouped .env style with section banners; mirrors a Pydantic Settings model field-for-field, so any rename here must be reflected in app/core/config.py."
+    },
+    {
+      "id": "document:README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "README.md",
+      "summary": "Project README (in Chinese) for the Self-Agent enterprise AI Agent. Covers features, tech stack (LangGraph + MCP + A2A + multi-protocol LLM), a 5-minute quick start (docker-compose infra, dependency install, env config, server launch, first chat), project structure, the three interaction modes (React web chat, local/remote CLI, direct API), documentation index, delivery progress, distributed tracing, upgrade guide, and known limitations.",
+      "tags": ["documentation", "entry-point", "onboarding", "quick-start", "overview"],
+      "complexity": "complex",
+      "languageNotes": "Markdown is primarily Simplified Chinese with bilingual technical terms; uses emoji section anchors and contains an explicit project-structure tree."
+    },
+    {
+      "id": "config:pyproject.toml",
+      "type": "config",
+      "name": "pyproject.toml",
+      "filePath": "pyproject.toml",
+      "summary": "PEP 621 build/dependency manifest for the self-agent Python (>=3.12) package. Declares the FastAPI/LangGraph/MCP/A2A stack with upper-bound version pins on every dependency for reproducible builds, optional-dependency extras, hatchling build backend targeting the app/ package, dependency-groups for dev tooling, and ruff + pytest configuration.",
+      "tags": ["configuration", "build-system", "dependencies", "packaging", "python"],
+      "complexity": "moderate",
+      "languageNotes": "Uses PEP 621 [project] table with hatchling build backend; all dependencies carry explicit <next-major upper bounds (commented rationale) and rely on uv.lock for reproducibility."
+    }
+  ],
+  "edges": [
+    {
+      "source": "config:.env.example",
+      "target": "file:app/core/config.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:app/main.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "service:infra/docker-compose.yml",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:pyproject.toml",
+      "target": "file:app/__init__.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:pyproject.toml",
+      "target": "document:README.md",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ]
+}

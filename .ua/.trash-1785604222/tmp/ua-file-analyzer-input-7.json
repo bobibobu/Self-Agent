@@ -1,0 +1,19 @@
+{
+  "projectRoot": "e:/AIwork/Self-Agent",
+  "batchFiles": [
+    {"path": "app/skills/base.py", "language": "python", "sizeLines": 69, "fileCategory": "code"},
+    {"path": "app/skills/builtin.py", "language": "python", "sizeLines": 78, "fileCategory": "code"},
+    {"path": "app/skills/registry.py", "language": "python", "sizeLines": 145, "fileCategory": "code"}
+  ],
+  "batchImportData": {
+    "app/skills/base.py": [],
+    "app/skills/builtin.py": [
+      "app/skills/base.py",
+      "app/skills/registry.py"
+    ],
+    "app/skills/registry.py": [
+      "app/core/logging.py",
+      "app/skills/base.py"
+    ]
+  }
+}

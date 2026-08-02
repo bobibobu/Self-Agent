@@ -1,0 +1,1133 @@
+{
+  "nodes": [
+    {
+      "id": "file:app/a2a/executor.py",
+      "type": "file",
+      "name": "executor.py",
+      "filePath": "app/a2a/executor.py",
+      "summary": "Implements the A2A (Agent-to-Agent) protocol executor that wraps the LangGraph agent, exposing execute and cancel operations for remote agent invocation.",
+      "tags": [
+        "a2a",
+        "executor",
+        "agent",
+        "service"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Subclasses the a2a-sdk AgentExecutor base class; delegates to run_agent from the core graph."
+    },
+    {
+      "id": "file:app/a2a/server.py",
+      "type": "file",
+      "name": "server.py",
+      "filePath": "app/a2a/server.py",
+      "summary": "Mounts A2A JSON-RPC and REST routes onto a FastAPI application, wiring up the executor, agent card, and in-memory task store.",
+      "tags": [
+        "a2a",
+        "server",
+        "fastapi",
+        "routing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:app/a2a/standalone.py",
+      "type": "file",
+      "name": "standalone.py",
+      "filePath": "app/a2a/standalone.py",
+      "summary": "Standalone entry point that creates a minimal FastAPI app exposing only the A2A endpoint, runnable via uvicorn with configurable host and port.",
+      "tags": [
+        "a2a",
+        "entry-point",
+        "standalone-server"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Uses argparse for CLI arguments and uvicorn.run() for the ASGI server."
+    },
+    {
+      "id": "file:app/agent/registry.py",
+      "type": "file",
+      "name": "registry.py",
+      "filePath": "app/agent/registry.py",
+      "summary": "Central tool registry managing tool registration, lookup, and risk classification (safe vs destructive) for the agent's tool-calling system.",
+      "tags": [
+        "tool-registry",
+        "agent",
+        "risk-classification",
+        "singleton"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:app/agent/tools/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "app/agent/tools/__init__.py",
+      "summary": "Built-in agent tools including a safe AST-based arithmetic calculator, current-time lookup with timezone support, and a mock weather query.",
+      "tags": [
+        "agent-tools",
+        "calculator",
+        "utility",
+        "entry-point"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "The calculator uses Python's ast module to safely evaluate arithmetic expressions without eval()."
+    },
+    {
+      "id": "file:app/agent/tools/files.py",
+      "type": "file",
+      "name": "files.py",
+      "filePath": "app/agent/tools/files.py",
+      "summary": "File-system tools for the agent: read, list, glob, grep, write, edit, and delete, all routed through workspace path resolution and sensitive-file guards.",
+      "tags": [
+        "agent-tools",
+        "filesystem",
+        "file-operations",
+        "sandboxed"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:app/agent/tools/shell.py",
+      "type": "file",
+      "name": "shell.py",
+      "filePath": "app/agent/tools/shell.py",
+      "summary": "Shell command execution tool that integrates sandbox wrapping (bubblewrap/Landlock), blocks destructive commands, and captures output with timeout handling.",
+      "tags": [
+        "agent-tools",
+        "shell-execution",
+        "sandboxed",
+        "security"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:app/core/logging.py",
+      "type": "file",
+      "name": "logging.py",
+      "filePath": "app/core/logging.py",
+      "summary": "Centralized logging configuration with OpenTelemetry trace-ID injection via a custom log filter, configurable format and log level from application settings.",
+      "tags": [
+        "logging",
+        "observability",
+        "otel",
+        "configuration"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Uses a contextvars-based trace ID propagated from OpenTelemetry, injected into every log record via a logging.Filter subclass."
+    },
+    {
+      "id": "file:app/db/manager.py",
+      "type": "file",
+      "name": "manager.py",
+      "filePath": "app/db/manager.py",
+      "summary": "Unified database connection manager for PostgreSQL, MongoDB, Redis, and Neo4j with lazy connect/disconnect lifecycle and settings-driven backend selection.",
+      "tags": [
+        "database",
+        "connection-manager",
+        "postgres",
+        "mongodb",
+        "redis"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Exposes each backend as a lazily-initialized property; _try wrapper logs and swallows connection errors so missing backends degrade gracefully."
+    },
+    {
+      "id": "class:app/a2a/executor.py:SelfAgentExecutor",
+      "type": "class",
+      "name": "SelfAgentExecutor",
+      "filePath": "app/a2a/executor.py",
+      "lineRange": [
+        31,
+        75
+      ],
+      "summary": "A2A executor that receives remote agent messages, delegates to the core run_agent function, and returns the reply as a task artifact.",
+      "tags": [
+        "a2a",
+        "executor",
+        "agent-delegation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/a2a/executor.py:build_agent_card",
+      "type": "function",
+      "name": "build_agent_card",
+      "filePath": "app/a2a/executor.py",
+      "lineRange": [
+        78,
+        96
+      ],
+      "summary": "Constructs the AgentCard metadata describing this agent's capabilities, skills, and endpoints for A2A discovery.",
+      "tags": [
+        "a2a",
+        "agent-card",
+        "metadata",
+        "factory"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/a2a/server.py:mount_a2a",
+      "type": "function",
+      "name": "mount_a2a",
+      "filePath": "app/a2a/server.py",
+      "lineRange": [
+        24,
+        61
+      ],
+      "summary": "Mounts A2A JSON-RPC and REST routes onto a FastAPI app, creating the executor, request handler, and in-memory task store.",
+      "tags": [
+        "a2a",
+        "mount",
+        "fastapi",
+        "routing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/a2a/standalone.py:create_a2a_app",
+      "type": "function",
+      "name": "create_a2a_app",
+      "filePath": "app/a2a/standalone.py",
+      "lineRange": [
+        24,
+        34
+      ],
+      "summary": "Creates a minimal FastAPI application with logging configured and the A2A endpoint mounted.",
+      "tags": [
+        "a2a",
+        "app-factory",
+        "fastapi"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/a2a/standalone.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "app/a2a/standalone.py",
+      "lineRange": [
+        37,
+        45
+      ],
+      "summary": "CLI entry point that parses host/port arguments and launches the standalone A2A server via uvicorn.",
+      "tags": [
+        "a2a",
+        "cli",
+        "entry-point",
+        "uvicorn"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/agent/registry.py:ToolRisk",
+      "type": "class",
+      "name": "ToolRisk",
+      "filePath": "app/agent/registry.py",
+      "lineRange": [
+        25,
+        36
+      ],
+      "summary": "Enum classifying tool risk levels (safe, destructive) used to gate which tools require user approval.",
+      "tags": [
+        "enum",
+        "risk-classification",
+        "type-definition"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/agent/registry.py:_risk_from_metadata",
+      "type": "function",
+      "name": "_risk_from_metadata",
+      "filePath": "app/agent/registry.py",
+      "lineRange": [
+        50,
+        61
+      ],
+      "summary": "Infers a ToolRisk level from a tool's metadata dictionary, falling back to safe when unspecified.",
+      "tags": [
+        "risk-classification",
+        "metadata",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/agent/registry.py:register_tool",
+      "type": "function",
+      "name": "register_tool",
+      "filePath": "app/agent/registry.py",
+      "lineRange": [
+        70,
+        75
+      ],
+      "summary": "Registers a single tool with its risk level in the global tool registry.",
+      "tags": [
+        "tool-registry",
+        "registration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/agent/registry.py:register_tools",
+      "type": "function",
+      "name": "register_tools",
+      "filePath": "app/agent/registry.py",
+      "lineRange": [
+        78,
+        84
+      ],
+      "summary": "Batch-registers multiple tools with a shared risk level by delegating to register_tool.",
+      "tags": [
+        "tool-registry",
+        "registration",
+        "batch"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/agent/registry.py:refresh_from_mcp",
+      "type": "function",
+      "name": "refresh_from_mcp",
+      "filePath": "app/agent/registry.py",
+      "lineRange": [
+        111,
+        125
+      ],
+      "summary": "Rebuilds the tool registry from a set of MCP-provided tools, reclassifying risk levels for each.",
+      "tags": [
+        "tool-registry",
+        "mcp",
+        "refresh"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/agent/tools/__init__.py:_safe_eval_node",
+      "type": "function",
+      "name": "_safe_eval_node",
+      "filePath": "app/agent/tools/__init__.py",
+      "lineRange": [
+        50,
+        73
+      ],
+      "summary": "Recursively evaluates a Python AST node using a whitelist of safe arithmetic and comparison operators, rejecting anything else.",
+      "tags": [
+        "calculator",
+        "ast",
+        "safe-eval",
+        "validation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/agent/tools/__init__.py:calculator",
+      "type": "function",
+      "name": "calculator",
+      "filePath": "app/agent/tools/__init__.py",
+      "lineRange": [
+        80,
+        92
+      ],
+      "summary": "Agent tool that safely evaluates an arithmetic expression string by parsing it to an AST and applying the safe evaluator.",
+      "tags": [
+        "agent-tool",
+        "calculator",
+        "arithmetic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/agent/tools/__init__.py:get_current_time",
+      "type": "function",
+      "name": "get_current_time",
+      "filePath": "app/agent/tools/__init__.py",
+      "lineRange": [
+        96,
+        108
+      ],
+      "summary": "Agent tool that returns the current time formatted for an optional IANA timezone string.",
+      "tags": [
+        "agent-tool",
+        "time",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/agent/tools/__init__.py:get_weather",
+      "type": "function",
+      "name": "get_weather",
+      "filePath": "app/agent/tools/__init__.py",
+      "lineRange": [
+        112,
+        130
+      ],
+      "summary": "Agent tool that returns mock weather data for a given city, intended as a demo placeholder tool.",
+      "tags": [
+        "agent-tool",
+        "weather",
+        "mock"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/agent/tools/files.py:read_file",
+      "type": "function",
+      "name": "read_file",
+      "filePath": "app/agent/tools/files.py",
+      "lineRange": [
+        53,
+        89
+      ],
+      "summary": "Agent tool that reads a text file within the workspace, supporting line-range slicing and blocking access to sensitive paths.",
+      "tags": [
+        "agent-tool",
+        "filesystem",
+        "read"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/agent/tools/files.py:list_dir",
+      "type": "function",
+      "name": "list_dir",
+      "filePath": "app/agent/tools/files.py",
+      "lineRange": [
+        93,
+        127
+      ],
+      "summary": "Agent tool that lists directory contents with file/directory type and size annotations, respecting workspace boundaries.",
+      "tags": [
+        "agent-tool",
+        "filesystem",
+        "list"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/agent/tools/files.py:glob_files",
+      "type": "function",
+      "name": "glob_files",
+      "filePath": "app/agent/tools/files.py",
+      "lineRange": [
+        131,
+        155
+      ],
+      "summary": "Agent tool that finds files matching a glob pattern within the workspace root.",
+      "tags": [
+        "agent-tool",
+        "filesystem",
+        "glob"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/agent/tools/files.py:grep_files",
+      "type": "function",
+      "name": "grep_files",
+      "filePath": "app/agent/tools/files.py",
+      "lineRange": [
+        159,
+        199
+      ],
+      "summary": "Agent tool that searches file contents for a query string or regex, with optional case-insensitive and file-pattern filtering.",
+      "tags": [
+        "agent-tool",
+        "filesystem",
+        "grep",
+        "search"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/agent/tools/files.py:write_file",
+      "type": "function",
+      "name": "write_file",
+      "filePath": "app/agent/tools/files.py",
+      "lineRange": [
+        206,
+        234
+      ],
+      "summary": "Agent tool that writes content to a file within the workspace, creating parent directories as needed.",
+      "tags": [
+        "agent-tool",
+        "filesystem",
+        "write"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/agent/tools/files.py:edit_file",
+      "type": "function",
+      "name": "edit_file",
+      "filePath": "app/agent/tools/files.py",
+      "lineRange": [
+        238,
+        283
+      ],
+      "summary": "Agent tool that performs a string replacement edit in a file, with optional replace-all semantics.",
+      "tags": [
+        "agent-tool",
+        "filesystem",
+        "edit"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/agent/tools/files.py:delete_file",
+      "type": "function",
+      "name": "delete_file",
+      "filePath": "app/agent/tools/files.py",
+      "lineRange": [
+        287,
+        311
+      ],
+      "summary": "Agent tool that deletes a file from the workspace after resolving and validating the path.",
+      "tags": [
+        "agent-tool",
+        "filesystem",
+        "delete"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app/agent/tools/shell.py:_looks_destructive",
+      "type": "function",
+      "name": "_looks_destructive",
+      "filePath": "app/agent/tools/shell.py",
+      "lineRange": [
+        51,
+        65
+      ],
+      "summary": "Checks whether a parsed command argv matches known destructive patterns (rm -rf, mkfs, dd, etc.) and returns a reason string if so.",
+      "tags": [
+        "security",
+        "validation",
+        "destructive-check"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/agent/tools/shell.py:run_command",
+      "type": "function",
+      "name": "run_command",
+      "filePath": "app/agent/tools/shell.py",
+      "lineRange": [
+        69,
+        145
+      ],
+      "summary": "Agent tool that executes a shell command inside the workspace sandbox, blocking destructive commands and capturing stdout/stderr with process-group timeout handling.",
+      "tags": [
+        "agent-tool",
+        "shell",
+        "sandboxed",
+        "execution"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:app/core/logging.py:TraceIdFilter",
+      "type": "class",
+      "name": "TraceIdFilter",
+      "filePath": "app/core/logging.py",
+      "lineRange": [
+        21,
+        31
+      ],
+      "summary": "Logging filter that injects the current OpenTelemetry trace ID into each log record so logs can be correlated with distributed traces.",
+      "tags": [
+        "logging",
+        "otel",
+        "trace-correlation",
+        "filter"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app/core/logging.py:setup_logging",
+      "type": "function",
+      "name": "setup_logging",
+      "filePath": "app/core/logging.py",
+      "lineRange": [
+        57,
+        73
+      ],
+      "summary": "Configures the root logger with a formatter, the trace-ID filter, and a log level derived from application settings.",
+      "tags": [
+        "logging",
+        "configuration",
+        "setup"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:app/db/manager.py:DBManager",
+      "type": "class",
+      "name": "DBManager",
+      "filePath": "app/db/manager.py",
+      "lineRange": [
+        31,
+        172
+      ],
+      "summary": "Manages lazy connections to PostgreSQL, MongoDB, Redis, and Neo4j backends, with graceful connect/disconnect lifecycle and per-backend error tolerance.",
+      "tags": [
+        "database",
+        "connection-manager",
+        "postgres",
+        "mongodb",
+        "redis"
+      ],
+      "complexity": "complex"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:app/a2a/executor.py",
+      "target": "class:app/a2a/executor.py:SelfAgentExecutor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/a2a/executor.py",
+      "target": "function:app/a2a/executor.py:build_agent_card",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/a2a/server.py",
+      "target": "function:app/a2a/server.py:mount_a2a",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/a2a/standalone.py",
+      "target": "function:app/a2a/standalone.py:create_a2a_app",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/a2a/standalone.py",
+      "target": "function:app/a2a/standalone.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/registry.py",
+      "target": "class:app/agent/registry.py:ToolRisk",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/registry.py",
+      "target": "function:app/agent/registry.py:_risk_from_metadata",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/registry.py",
+      "target": "function:app/agent/registry.py:register_tool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/registry.py",
+      "target": "function:app/agent/registry.py:register_tools",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/registry.py",
+      "target": "function:app/agent/registry.py:refresh_from_mcp",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/tools/__init__.py",
+      "target": "function:app/agent/tools/__init__.py:_safe_eval_node",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/tools/__init__.py",
+      "target": "function:app/agent/tools/__init__.py:calculator",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/tools/__init__.py",
+      "target": "function:app/agent/tools/__init__.py:get_current_time",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/tools/__init__.py",
+      "target": "function:app/agent/tools/__init__.py:get_weather",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "function:app/agent/tools/files.py:read_file",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "function:app/agent/tools/files.py:list_dir",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "function:app/agent/tools/files.py:glob_files",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "function:app/agent/tools/files.py:grep_files",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "function:app/agent/tools/files.py:write_file",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "function:app/agent/tools/files.py:edit_file",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "function:app/agent/tools/files.py:delete_file",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/tools/shell.py",
+      "target": "function:app/agent/tools/shell.py:_looks_destructive",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/agent/tools/shell.py",
+      "target": "function:app/agent/tools/shell.py:run_command",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/core/logging.py",
+      "target": "class:app/core/logging.py:TraceIdFilter",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/core/logging.py",
+      "target": "function:app/core/logging.py:setup_logging",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/db/manager.py",
+      "target": "class:app/db/manager.py:DBManager",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app/a2a/executor.py",
+      "target": "class:app/a2a/executor.py:SelfAgentExecutor",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/a2a/executor.py",
+      "target": "function:app/a2a/executor.py:build_agent_card",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/a2a/server.py",
+      "target": "function:app/a2a/server.py:mount_a2a",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/a2a/standalone.py",
+      "target": "function:app/a2a/standalone.py:create_a2a_app",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/a2a/standalone.py",
+      "target": "function:app/a2a/standalone.py:main",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/registry.py",
+      "target": "class:app/agent/registry.py:ToolRisk",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/registry.py",
+      "target": "function:app/agent/registry.py:_risk_from_metadata",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/registry.py",
+      "target": "function:app/agent/registry.py:register_tool",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/registry.py",
+      "target": "function:app/agent/registry.py:register_tools",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/registry.py",
+      "target": "function:app/agent/registry.py:refresh_from_mcp",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/tools/__init__.py",
+      "target": "function:app/agent/tools/__init__.py:_safe_eval_node",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/tools/__init__.py",
+      "target": "function:app/agent/tools/__init__.py:calculator",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/tools/__init__.py",
+      "target": "function:app/agent/tools/__init__.py:get_current_time",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/tools/__init__.py",
+      "target": "function:app/agent/tools/__init__.py:get_weather",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "function:app/agent/tools/files.py:read_file",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "function:app/agent/tools/files.py:list_dir",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "function:app/agent/tools/files.py:glob_files",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "function:app/agent/tools/files.py:grep_files",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "function:app/agent/tools/files.py:write_file",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "function:app/agent/tools/files.py:edit_file",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "function:app/agent/tools/files.py:delete_file",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/tools/shell.py",
+      "target": "function:app/agent/tools/shell.py:_looks_destructive",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/agent/tools/shell.py",
+      "target": "function:app/agent/tools/shell.py:run_command",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/core/logging.py",
+      "target": "class:app/core/logging.py:TraceIdFilter",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/core/logging.py",
+      "target": "function:app/core/logging.py:setup_logging",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/db/manager.py",
+      "target": "class:app/db/manager.py:DBManager",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app/a2a/executor.py",
+      "target": "file:app/agent/graph.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/a2a/executor.py",
+      "target": "file:app/core/logging.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/a2a/server.py",
+      "target": "file:app/a2a/executor.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/a2a/server.py",
+      "target": "file:app/core/logging.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/a2a/standalone.py",
+      "target": "file:app/a2a/server.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/a2a/standalone.py",
+      "target": "file:app/core/logging.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/agent/registry.py",
+      "target": "file:app/agent/tools/__init__.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/agent/registry.py",
+      "target": "file:app/core/logging.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/agent/tools/__init__.py",
+      "target": "file:app/core/logging.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "file:app/core/config.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "file:app/core/logging.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/agent/tools/files.py",
+      "target": "file:app/workspace.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/agent/tools/shell.py",
+      "target": "file:app/core/config.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/agent/tools/shell.py",
+      "target": "file:app/core/logging.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/agent/tools/shell.py",
+      "target": "file:app/sandbox.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/agent/tools/shell.py",
+      "target": "file:app/workspace.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/core/logging.py",
+      "target": "file:app/core/config.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/db/manager.py",
+      "target": "file:app/core/config.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app/db/manager.py",
+      "target": "file:app/core/logging.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "class:app/a2a/executor.py:SelfAgentExecutor",
+      "target": "function:app/agent/graph.py:run_agent",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:app/a2a/server.py:mount_a2a",
+      "target": "function:app/a2a/executor.py:build_agent_card",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:app/a2a/server.py:mount_a2a",
+      "target": "class:app/a2a/executor.py:SelfAgentExecutor",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:app/a2a/standalone.py:create_a2a_app",
+      "target": "function:app/a2a/server.py:mount_a2a",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:app/agent/tools/shell.py:run_command",
+      "target": "function:app/sandbox.py:wrap_command",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:app/agent/tools/shell.py:run_command",
+      "target": "function:app/workspace.py:get_workspace",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:app/agent/tools/files.py:read_file",
+      "target": "function:app/workspace.py:get_workspace",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

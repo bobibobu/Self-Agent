@@ -1,0 +1,52 @@
+{
+  "projectRoot": "e:/AIwork/Self-Agent",
+  "batchFiles": [
+    {"path": "app/agent/graph.py", "language": "python", "sizeLines": 555, "fileCategory": "code"},
+    {"path": "app/agent/nodes/agent_node.py", "language": "python", "sizeLines": 130, "fileCategory": "code"},
+    {"path": "app/agent/nodes/bridge.py", "language": "python", "sizeLines": 74, "fileCategory": "code"},
+    {"path": "app/agent/nodes/tools_node.py", "language": "python", "sizeLines": 211, "fileCategory": "code"},
+    {"path": "app/agent/plan.py", "language": "python", "sizeLines": 127, "fileCategory": "code"},
+    {"path": "app/agent/prompts/__init__.py", "language": "python", "sizeLines": 25, "fileCategory": "code"},
+    {"path": "app/agent/state.py", "language": "python", "sizeLines": 39, "fileCategory": "code"},
+    {"path": "app/core/telemetry.py", "language": "python", "sizeLines": 274, "fileCategory": "code"}
+  ],
+  "batchImportData": {
+    "app/agent/graph.py": [
+      "app/agent/nodes/agent_node.py",
+      "app/agent/nodes/tools_node.py",
+      "app/agent/prompts/__init__.py",
+      "app/agent/state.py",
+      "app/core/config.py",
+      "app/core/logging.py",
+      "app/core/telemetry.py",
+      "app/memory/checkpointer.py"
+    ],
+    "app/agent/nodes/agent_node.py": [
+      "app/agent/nodes/bridge.py",
+      "app/agent/state.py",
+      "app/core/logging.py",
+      "app/core/telemetry.py",
+      "app/llm/factory.py"
+    ],
+    "app/agent/nodes/bridge.py": [
+      "app/llm/models.py"
+    ],
+    "app/agent/nodes/tools_node.py": [
+      "app/agent/plan.py",
+      "app/agent/registry.py",
+      "app/agent/state.py",
+      "app/core/config.py",
+      "app/core/logging.py",
+      "app/core/telemetry.py"
+    ],
+    "app/agent/plan.py": [
+      "app/core/logging.py"
+    ],
+    "app/agent/prompts/__init__.py": [],
+    "app/agent/state.py": [],
+    "app/core/telemetry.py": [
+      "app/core/config.py",
+      "app/core/logging.py"
+    ]
+  }
+}

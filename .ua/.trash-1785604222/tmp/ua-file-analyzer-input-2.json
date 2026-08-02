@@ -1,0 +1,37 @@
+{
+  "projectRoot": "e:/AIwork/Self-Agent",
+  "batchFiles": [
+    {"path": "app/agent/context_manager.py", "language": "python", "sizeLines": 111, "fileCategory": "code"},
+    {"path": "app/core/exceptions.py", "language": "python", "sizeLines": 91, "fileCategory": "code"},
+    {"path": "app/evolution/memory_learner.py", "language": "python", "sizeLines": 134, "fileCategory": "code"},
+    {"path": "app/evolution/prompt_store.py", "language": "python", "sizeLines": 118, "fileCategory": "code"},
+    {"path": "app/evolution/reflector.py", "language": "python", "sizeLines": 161, "fileCategory": "code"},
+    {"path": "app/llm/__init__.py", "language": "python", "sizeLines": 37, "fileCategory": "code"},
+    {"path": "app/llm/base.py", "language": "python", "sizeLines": 46, "fileCategory": "code"},
+    {"path": "app/llm/factory.py", "language": "python", "sizeLines": 75, "fileCategory": "code"},
+    {"path": "app/llm/models.py", "language": "python", "sizeLines": 102, "fileCategory": "code"},
+    {"path": "app/llm/providers/anthropic.py", "language": "python", "sizeLines": 199, "fileCategory": "code"},
+    {"path": "app/llm/providers/openai_like.py", "language": "python", "sizeLines": 260, "fileCategory": "code"},
+    {"path": "scripts/verify_agent.py", "language": "python", "sizeLines": 123, "fileCategory": "code"},
+    {"path": "scripts/verify_hermes.py", "language": "python", "sizeLines": 143, "fileCategory": "code"},
+    {"path": "scripts/verify_phase2.py", "language": "python", "sizeLines": 145, "fileCategory": "code"},
+    {"path": "scripts/verify_stream.py", "language": "python", "sizeLines": 130, "fileCategory": "code"}
+  ],
+  "batchImportData": {
+    "app/agent/context_manager.py": ["app/core/logging.py", "app/llm/factory.py", "app/llm/models.py"],
+    "app/core/exceptions.py": [],
+    "app/evolution/memory_learner.py": ["app/core/logging.py", "app/llm/factory.py", "app/llm/models.py"],
+    "app/evolution/prompt_store.py": ["app/core/logging.py"],
+    "app/evolution/reflector.py": ["app/core/logging.py", "app/evolution/prompt_store.py", "app/llm/factory.py", "app/llm/models.py"],
+    "app/llm/__init__.py": ["app/llm/base.py", "app/llm/factory.py", "app/llm/models.py"],
+    "app/llm/base.py": ["app/llm/models.py"],
+    "app/llm/factory.py": ["app/core/config.py", "app/core/exceptions.py", "app/llm/base.py", "app/llm/providers/anthropic.py", "app/llm/providers/openai_like.py"],
+    "app/llm/models.py": [],
+    "app/llm/providers/anthropic.py": ["app/core/exceptions.py", "app/core/logging.py", "app/llm/models.py", "app/llm/providers/anthropic.py"],
+    "app/llm/providers/openai_like.py": ["app/core/exceptions.py", "app/core/logging.py", "app/llm/models.py"],
+    "scripts/verify_agent.py": ["app/llm/base.py", "app/llm/models.py"],
+    "scripts/verify_hermes.py": ["app/llm/models.py"],
+    "scripts/verify_phase2.py": ["app/llm/models.py"],
+    "scripts/verify_stream.py": ["app/llm/models.py"]
+  }
+}
