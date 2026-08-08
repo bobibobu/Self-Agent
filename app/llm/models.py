@@ -66,6 +66,13 @@ class ChatRequest(BaseModel):
     max_tokens: int | None = None
     tools: list[ToolDefinition] | None = None
     tool_choice: str = "auto"           # auto / none / required / 具体工具名
+    # ★ 结构化输出契约（2026-08）：要求 LLM 返回符合该 JSON Schema 的对象。
+    # OpenAI/GLM 用 response_format={"type":"json_schema","json_schema":{...}}，
+    # Anthropic 用 tool_use 约束（见 providers/anthropic.py）。
+    # None 表示自由文本输出（默认，向后兼容）。这是治「格式幻觉」的手段——
+    # 让模型必须输出合法 JSON，而非可能拼错的裸文本。注意它治格式不治内容：
+    # 一个语法合法的 JSON 仍可能含编造的值。
+    response_format: dict[str, Any] | None = None
 
 
 class ChatResponse(BaseModel):

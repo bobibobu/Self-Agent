@@ -147,13 +147,32 @@ class AnthropicClient:
         )
 
     # ---------- 接口实现 ----------
+    def _system_param(self, system_text: str) -> Any:
+        """构造 Anthropic 的 system 参数，标注 cache_control 让 prompt caching 命中。
+
+        Anthropic 的 system 可以是字符串，也可以是 content blocks 列表（每块可独立标
+        cache_control）。我们用 blocks 形式，在 system 文本块末尾标 ephemeral cache（5min TTL）。
+
+        局限：当前把整段 system 当一个块标 cache。由于动态记忆/RAG 拼在 system 末尾，
+        这些每轮变的内容会让整块缓存失效。更好的做法是把 SYSTEM_PROMPT 静态主体和动态
+        后缀切成两块，只给静态块标 cache——但这需要 graph 层用哨兵分隔，留作后续优化。
+        对「无 RAG/记忆的简单多轮对话」（system 每轮完全相同），本实现能直接命中，省 ~90%。
+        """
+        if not system_text:
+            return None
+        return [{
+            "type": "text",
+            "text": system_text,
+            "cache_control": {"type": "ephemeral"},
+        }]
+
     async def chat(self, request: ChatRequest) -> ChatResponse:
         model = request.model or self._default_model
         system, msgs = self._split_system(request.messages)
         try:
             resp = await self._client.messages.create(
                 model=model,
-                system=system,
+                system=self._system_param(system),
                 messages=self._to_anthropic_messages(msgs),
                 temperature=request.temperature,
                 max_tokens=request.max_tokens or 4096,
@@ -177,7 +196,7 @@ class AnthropicClient:
         try:
             async with self._client.messages.stream(
                 model=model,
-                system=system,
+                system=self._system_param(system),
                 messages=self._to_anthropic_messages(msgs),
                 temperature=request.temperature,
                 max_tokens=request.max_tokens or 4096,

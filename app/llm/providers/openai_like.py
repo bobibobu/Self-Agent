@@ -149,15 +149,19 @@ class OpenAILikeClient:
     # ---------- 接口实现 ----------
     async def chat(self, request: ChatRequest) -> ChatResponse:
         model = request.model or self._default_model
+        kwargs: dict[str, Any] = dict(
+            model=model,
+            messages=self._to_openai_messages(request.messages),  # type: ignore[arg-type]
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+            tools=self._to_openai_tools(request),
+            tool_choice=request.tool_choice if request.tools else None,
+        )
+        # 结构化输出：OpenAI/GLM 都接受 response_format（json_object / json_schema）
+        if request.response_format is not None:
+            kwargs["response_format"] = request.response_format
         try:
-            resp = await self._client.chat.completions.create(
-                model=model,
-                messages=self._to_openai_messages(request.messages),  # type: ignore[arg-type]
-                temperature=request.temperature,
-                max_tokens=request.max_tokens,
-                tools=self._to_openai_tools(request),
-                tool_choice=request.tool_choice if request.tools else None,
-            )
+            resp = await self._client.chat.completions.create(**kwargs)
         except Exception as e:
             logger.exception("%s chat 调用失败", self._provider)
             raise LLMError(f"{self._provider} 调用失败: {e}", provider=self._provider) from e
@@ -175,19 +179,22 @@ class OpenAILikeClient:
         import json
 
         model = request.model or self._default_model
+        kwargs: dict[str, Any] = dict(
+            model=model,
+            messages=self._to_openai_messages(request.messages),  # type: ignore[arg-type]
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+            tools=self._to_openai_tools(request),
+            tool_choice=request.tool_choice if request.tools else None,
+            stream=True,
+            # 让服务端在流末尾附带 usage（OpenAI 与 GLM 都支持；
+            # 不支持的兼容端点会忽略该字段，此时 usage 为空，不影响主流程）
+            stream_options={"include_usage": True},
+        )
+        if request.response_format is not None:
+            kwargs["response_format"] = request.response_format
         try:
-            stream = await self._client.chat.completions.create(
-                model=model,
-                messages=self._to_openai_messages(request.messages),  # type: ignore[arg-type]
-                temperature=request.temperature,
-                max_tokens=request.max_tokens,
-                tools=self._to_openai_tools(request),
-                tool_choice=request.tool_choice if request.tools else None,
-                stream=True,
-                # 让服务端在流末尾附带 usage（OpenAI 与 GLM 都支持；
-                # 不支持的兼容端点会忽略该字段，此时 usage 为空，不影响主流程）
-                stream_options={"include_usage": True},
-            )
+            stream = await self._client.chat.completions.create(**kwargs)
         except Exception as e:
             raise LLMError(f"{self._provider} 流式调用失败: {e}", provider=self._provider) from e
 

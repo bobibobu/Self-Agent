@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import StreamWriter
 
@@ -46,6 +46,11 @@ async def agent_node(state: AgentState, config: RunnableConfig, writer: StreamWr
     configurable = config.get("configurable", {})
     tools = configurable.get("tools", [])
     system_prompt = configurable.get("system_prompt")
+    current_time = configurable.get("current_time")
+    # ★ 结构化输出契约（可选）：若调用方在 config 里指定 response_format，
+    # 则强制 LLM 返回符合该 JSON Schema 的对象。用于治「格式幻觉」场景
+    # （如 A2A 委托返回结构化结果、工具决策）。默认 None = 自由文本。
+    response_format = configurable.get("response_format")
 
     # 上下文窗口管理：消息过长时自动压缩早期消息为摘要
     from app.agent.context_manager import compress_if_needed
@@ -56,7 +61,16 @@ async def agent_node(state: AgentState, config: RunnableConfig, writer: StreamWr
     if system_prompt:
         messages = [SystemMessage(content=system_prompt), *messages]
 
-    request = build_chat_request(messages, tools)
+    # ★ 当前时间作为参考资料拼到对话末尾（不写回 state，只用于这次 LLM 调用）。
+    # 用 HumanMessage 承载而非 SystemMessage：① 保持「恰好一条 system」的断言
+    # （见 test_llm_still_receives_exactly_one_system_prompt）；② 语义上是「给模型
+    # 的环境信息」而非指令。关键：它**必须放在最末尾**——SYSTEM_PROMPT 在最前面
+    # 是静态的（缓存前缀），时间戳每轮变所以只能放后面，不能放前面破坏缓存。
+    # 注意这里的 messages 是 compress_if_needed 返回的局部副本，追加不会影响 state。
+    if current_time:
+        messages = [*messages, HumanMessage(content=f"[当前时间：{current_time}]")]
+
+    request = build_chat_request(messages, tools, response_format=response_format)
     llm = get_llm_client()
 
     logger.debug("agent_node 调用 %s，消息数=%d", llm.provider_name, len(request.messages))

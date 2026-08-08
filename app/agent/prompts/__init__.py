@@ -2,6 +2,14 @@
 Agent 提示词模板
 -----------------
 集中管理系统提示词，便于迭代与 A/B 测试。
+
+★ 提示词缓存设计（2026-08 改造）：
+   这段 SYSTEM_PROMPT 必须保持**完全静态**——不含任何占位符、不依赖运行时变量。
+   原因：LLM 的 prompt caching（GLM/OpenAI/Anthropic）只认**精确前缀匹配**，
+   本段是整个请求最前面的内容，一旦每轮变化，整条缓存的 KV 张量就得重算，
+   导致缓存永远 miss。当前时间不再嵌进这里，而是由 agent_node 在调用时
+   作为一条**临时**消息拼到对话历史末尾（不写回 state，不破坏缓存前缀）。
+   见 app/agent/graph.py 的 _build_system_prompt 和 agent_node 的拼装逻辑。
 """
 
 SYSTEM_PROMPT = """你是 Self-Agent，一个乐于助人、安全可靠的通用个人助理。
@@ -21,5 +29,5 @@ SYSTEM_PROMPT = """你是 Self-Agent，一个乐于助人、安全可靠的通�
 4. 回答简洁、聚焦用户问题，必要时用列表/分点提高可读性。
 5. 使用与用户一致的语言（中文问则中文答）。
 
-当前时间供参考（具体请用 get_current_time 工具确认）：{current_time}
+如需确切时间，请调用 get_current_time 工具（当前时间会作为参考资料附在对话末尾）。
 """.strip()

@@ -66,9 +66,19 @@ def build_tool_definitions(tools: list[Any]) -> list[ToolDefinition]:
     return defs
 
 
-def build_chat_request(messages: list[BaseMessage], tools: list[Any] | None) -> ChatRequest:
-    """组装一次 LLM 请求。"""
+def build_chat_request(
+    messages: list[BaseMessage],
+    tools: list[Any] | None,
+    response_format: dict[str, Any] | None = None,
+) -> ChatRequest:
+    """组装一次 LLM 请求。
+
+    response_format（可选）：OpenAI 风格的结构化输出 schema，形如
+        {"type": "json_schema", "json_schema": {"name": "...", "schema": {...}, "strict": True}}
+    传入后，支持的 provider 会强制 LLM 输出符合 schema 的 JSON，治「格式幻觉」。
+    """
     return ChatRequest(
         messages=lc_to_chat_messages(messages),
         tools=build_tool_definitions(tools) if tools else None,
+        response_format=response_format,
     )

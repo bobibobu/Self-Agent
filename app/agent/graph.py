@@ -71,29 +71,50 @@ def _spawn(coro):
     t.add_done_callback(_background_tasks.discard)
     return t
 
+def _current_time_str() -> str:
+    """当前时间字符串（供 agent_node 作为参考资料拼到对话末尾）。
+
+    这个时间**不进 SYSTEM_PROMPT**——它每轮都变，放 system 会破坏 prompt
+    caching 的精确前缀匹配。改走 config 侧通道传给 agent_node，在调用 LLM 前
+    临时拼成一条消息放对话末尾，用完即弃，不写回 state。
+    """
+    return datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M (%Z)")
+
+
 def _build_system_prompt() -> str:
-    """构造系统提示词（注入当前时间 + 已加载 Skill 的提示词片段）。
+    """构造系统提示词（静态主体 + 已加载 Skill 的提示词片段）。
 
     提示词从 prompt_store 动态读取（Hermes 反思优化后下次对话自动生效），
     无版本时回退到内置默认。
 
     返回纯文本而不是 SystemMessage：系统提示**不进** checkpointer 持久化的
     messages（见 run_agent 的说明），只在调用 LLM 时临时拼到最前面。
+
+    ★ 提示词缓存设计（2026-08 改造）：
+       本函数返回的内容**在应用一次运行期间完全静态**——不含当前时间、
+       不含每次请求才变的量。这样它作为整个 LLM 请求的最前面一段，
+       能让 GLM/OpenAI/Anthropic 的 prompt caching 命中（精确前缀匹配）。
+       当前时间改由调用入口（run_agent / _stream_graph）生成，走 config
+       侧通道传给 agent_node，在调用 LLM 前临时拼到对话末尾，不进 system，
+       也不写回 state——避免破坏缓存前缀，也避免 add_messages 累积。
     """
-    now = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M (%Z)")
     # 优先用 Hermes 优化后的提示词版本，回退内置默认
     try:
         from app.evolution.prompt_store import get_current_prompt
         base_prompt = get_current_prompt()
     except Exception:  # noqa: BLE001
         base_prompt = SYSTEM_PROMPT
-    # 内置默认含 {current_time} 占位；优化版本可能没有，做容错
+    # 旧版本可能含 {current_time} 占位符（改造前的 SYSTEM_PROMPT 有）。
+    # 用空串替代而非真实时间：既保证 .format 不报错，又不让前缀每轮变化。
+    # 新版 SYSTEM_PROMPT 已无占位符，这段是空操作。
     try:
-        base = base_prompt.format(current_time=now)
+        base = base_prompt.format(current_time="")
     except (KeyError, IndexError):
         base = base_prompt
 
-    # 拼接已加载 Skill 的专属提示词
+    # 拼接已加载 Skill 的专属提示词。
+    # Skill 在应用启动时加载（见 app/main.py lifespan），之后不变——
+    # 所以这段拼接在一次运行内也是静态的，不破坏缓存前缀。
     skill_prompts: list[str] = []
     try:
         from app.skills.registry import skill_registry
@@ -161,6 +182,9 @@ async def run_agent(message: str, thread_id: str, user_id: str | None = None, kb
                 "thread_id": scoped_tid,
                 "tools": get_all_tools(),
                 "system_prompt": system_prompt,
+                # 当前时间走 config 侧通道（不进 SYSTEM_PROMPT），由 agent_node
+                # 临时拼到对话末尾。这是为了让 system prompt 完全静态、命中缓存。
+                "current_time": _current_time_str(),
             },
             "recursion_limit": get_settings().agent_recursion_limit,  # 防止 agent↔tools 死循环
         }
@@ -419,10 +443,13 @@ async def _stream_graph(
             # 上下文（含系统提示）还在这一轮的执行状态里。
             graph_input = resume_command
         else:
-            # 同 run_agent：系统提示走 config，不进持久化 messages
+            # 同 run_agent：系统提示走 config，不进持久化 messages。
+            # current_time 也走 config：不进 SYSTEM_PROMPT（否则破坏缓存前缀），
+            # 由 agent_node 临时拼到对话末尾。
             config["configurable"]["system_prompt"] = await _build_system_prompt_with_context(
                 message or "", user_id, kb_ids, tenant_id,
             )
+            config["configurable"]["current_time"] = _current_time_str()
             graph_input = {"messages": [HumanMessage(content=message or "")]}
 
         # 注册流式任务（支持取消）—— 用原始 thread_id 作 cancel key（客户端用原始 id 取消）

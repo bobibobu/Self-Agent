@@ -32,7 +32,11 @@ class _MockLLM:
     async def chat(self, request):
         from app.llm.models import ChatResponse, ToolCall, Usage
 
-        last = request.messages[-1] if request.messages else None
+        # agent_node 会在对话末尾追加一条「[当前时间：...]」的 HumanMessage 作为
+        # 环境参考（见 agent_node）。它不是用户提问也不是工具结果——判断「最后一条
+        # 是不是 tool」时要跳过它，否则工具结果回填后的总结步会走错分支。
+        msgs = [m for m in request.messages if not (m.role == "user" and m.content.startswith("[当前时间："))]
+        last = msgs[-1] if msgs else None
         if last and last.role == "tool":
             return ChatResponse(
                 content=f"根据查询，结果是：{last.content[:40]}",
@@ -40,7 +44,8 @@ class _MockLLM:
                 model="mock",
                 finish_reason="stop",
             )
-        user_msg = next((m.content for m in reversed(request.messages) if m.role == "user"), "")
+        # 取最后一条「真实用户提问」。
+        user_msg = next((m.content for m in reversed(msgs) if m.role == "user"), "")
         if "天气" in (user_msg or "") and request.tools:
             return ChatResponse(
                 tool_calls=[ToolCall(id="c1", name="get_weather", arguments={"city": "北京"})],
