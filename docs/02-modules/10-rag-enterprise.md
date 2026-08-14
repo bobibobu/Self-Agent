@@ -49,7 +49,7 @@ curl -X POST http://localhost:8000/chat \
 - `POST /upload`：上传文件（multipart/form-data）
   - 文本类（txt/md/json/csv/py 等）：提取内容，可 `auto_ingest=true` 自动入 RAG
   - 图片类（png/jpg）：存储，返回访问 URL
-- `GET /uploads`：列出已上传文件
+- `GET /uploads`：列出已上传文件（**仅管理员**——上传目录未按租户/用户分区，列表会暴露所有用户的文件名）
 
 ### 安全
 - 大小限制 `UPLOAD_MAX_SIZE_MB`（默认 20MB）
@@ -72,7 +72,7 @@ curl -X POST http://localhost:8000/chat \
 ## 四、可观测（/metrics）
 
 ### 端点
-`GET /metrics`
+`GET /metrics`（**仅管理员**）
 
 返回运行时指标：
 - 运行时长、总请求数

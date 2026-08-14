@@ -31,18 +31,33 @@ def _ensure_dir() -> None:
     _PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
+# 当前提示词缓存：(st_mtime_ns, st_size) → content。
+# get_current_prompt 在每次 /chat 都会被调用（构造系统提示），
+# 不缓存的话每个请求都做一次同步磁盘读 + JSON 解析；
+# 用 mtime+size 做校验，Hermes 写入新版本后下一次读取自动失效。
+_current_prompt_cache: tuple[tuple[int, int], str] | None = None
+
+
 def get_current_prompt() -> str:
     """获取当前生效的系统提示词。
 
     若无历史版本，返回内置默认提示词。
     """
+    global _current_prompt_cache
     _ensure_dir()
     if _CURRENT_FILE.exists():
         try:
+            st = _CURRENT_FILE.stat()
+            stamp = (st.st_mtime_ns, st.st_size)
+            if _current_prompt_cache is not None and _current_prompt_cache[0] == stamp:
+                return _current_prompt_cache[1]
             data = json.loads(_CURRENT_FILE.read_text(encoding="utf-8"))
-            return data.get("content", "")
+            content = data.get("content", "")
+            _current_prompt_cache = (stamp, content)
+            return content
         except Exception:  # noqa: BLE001
             logger.warning("当前提示词文件损坏，回退默认")
+            _current_prompt_cache = None
     # 回退到内置默认
     from app.agent.prompts import SYSTEM_PROMPT
     return SYSTEM_PROMPT

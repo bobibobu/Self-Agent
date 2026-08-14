@@ -25,10 +25,11 @@
 
 **实现**：LangGraph 的 checkpointer，按 `thread_id` 保存状态快照。
 
-| 环境 | 实现 | 特点 |
+| 后端（`STORAGE_BACKEND=auto` 默认） | 实现 | 特点 |
 |---|---|---|
-| 开发 | `MemorySaver` | 内存，重启丢失 |
-| 生产 | `AsyncPostgresSaver` | Postgres 持久化，跨进程 |
+| 优先 | `AsyncPostgresSaver` | Postgres 持久化，跨进程共享 |
+| 回退（连不上时，日志 WARNING） | `MemorySaver` | 内存，重启丢失 |
+| CLI 本地模式 | SQLite（按工作区哈希分库） | 单机持久化 |
 
 ```python
 # 同 thread_id 自动续接上下文
@@ -45,10 +46,10 @@ POST /chat {"message":"我叫什么？", "thread_id":"t2"}  # → 不知道（�
 
 **实现**：LangGraph 的 BaseStore，按 namespace（`("user", user_id)`）隔离。
 
-| 环境 | 实现 | embedding |
+| 后端 | 实现 | embedding |
 |---|---|---|
-| 开发 | `InMemoryStore` + 哈希 embed | 零依赖伪语义 |
-| 生产 | `PostgresStore` | 真实 embedding（如 OpenAI） |
+| PG 可用 | `AsyncPostgresStore` | 配了 API key 用真实 embedding |
+| PG 不可用（回退） | `InMemoryStore` | 未配 key 时降级为哈希伪向量（检索失去语义，日志 WARNING） |
 
 ```python
 # 添加记忆
@@ -60,7 +61,8 @@ GET /memory/u1?query=用户的回答风格偏好
 ```
 
 **语义检索原理**：文本经 embedding 转成向量，查询时算余弦相似度排序。
-开发期用确定性哈希 embed（零依赖）；生产换真实 embedding 模型。
+是否真实 embedding 取决于**有无 API key**（`auto` 跟随 LLM provider），与开发/生产环境无关：
+配了 key 走真实向量化；没配降级为确定性哈希伪向量（零依赖但无语义）。
 
 **文件**：`app/memory/store.py`、`app/memory/store.py:MemoryService`
 

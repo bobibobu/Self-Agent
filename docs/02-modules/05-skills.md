@@ -72,7 +72,7 @@ class EmailSkill(SkillBase):
   │     │   ├─ register_tools(skill.tools) # 工具 → Agent 注册表
   │     │   └─ 标记为 loaded
   │     │
-  │     └─ Skill 提示词在 _build_system_message() 时拼接进系统提示
+  │     └─ Skill 提示词在 _build_system_prompt() 时拼接进系统提示
   │
   └─ Agent 运行时：工具统一从 registry 取，提示词已含 Skill 指导
 ```

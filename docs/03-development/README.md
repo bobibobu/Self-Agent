@@ -30,6 +30,7 @@ docker compose logs -f postgres       # 看日志
 # 应用
 uv run uvicorn app.main:app --reload  # 启动（热重载）
 python scripts/verify_agent.py        # 快速验证核心逻辑（无需 DB/key）
+python scripts/benchmark.py           # 性能基准：框架层 QPS（mock LLM，无需 DB/key）
 
 # 代码质量
 ruff check app/                       # lint

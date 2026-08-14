@@ -3,6 +3,10 @@
 > 模拟高级面试官针对 Self-Agent 项目的深度提问，附详尽参考答案。
 > 每个答案结合项目实际实现，可对照源码。
 
+> 📈 **性能/优化实战经历**（面试高频加分项）：见
+> [optimization-cases.md](optimization-cases.md) —— 真实案例库，含
+> 「消灭双 LLM 调用」（发现→根因→方案→量化证据→追问链预演）。
+
 ---
 
 ## 一、架构设计类
@@ -20,8 +24,9 @@
 
 ### Q2: 如果 QPS 上万，瓶颈在哪？怎么扩展？
 
-**答**：
-1. **LLM 调用是最大瓶颈**（秒级延迟）。横向扩展应用层无状态实例 + 对 LLM 做**请求队列与并发控制**（避免触发 provider 限流）。本项目用 Redis 做缓存（相同问题命中）和限流计数。
+**答**（以下有实测数据支撑，完整报告见 [性能基准报告](../04-guides/性能基准报告.md)，2026-08 实测）：
+0. **先分层定位瓶颈**：mock LLM 零延迟压测框架层——单 worker 新会话 ~680 rps、长会话 ~475 rps、流式 ~400-500 rps；接真实 GLM 后并发 10 只有 **2.5 rps**（e2e p50 ≈ 2.6s）。**框架开销占不到 1%，真实瓶颈在 LLM provider**——此时扩应用实例无收益，先解决 provider 侧。
+1. **LLM 调用是最大瓶颈**（秒级延迟）。横向扩展应用层无状态实例 + 对 LLM 做**请求队列与并发控制**（避免触发 provider 限流）、必要时上多 key 池。本项目用 Redis 做缓存（相同问题命中）和限流计数。
 2. **Postgres 连接池**：`asyncpg` 池大小可调，配合 PgBouncer 做连接复用。
 3. **短期记忆**：高并发下 Postgres checkpointer 会成热点，可换 ShardedPostgresSaver 按 thread_id 分片。
 4. **无状态化**：把会话状态全放外部存储（已做到——checkpointer 在 DB），应用实例可随意水平扩缩。
@@ -51,11 +56,13 @@
 
 ### Q6: 多个工具调用怎么并发执行？
 
-**答**：`tools_node` 当前是顺序执行 tool_calls。可优化为 `asyncio.gather` 并发：
+**答**：`tools_node` 用 `asyncio.gather` **并发执行**同一轮的所有 tool_calls（`tools_node.py:190`）：
 ```python
-results = await asyncio.gather(*[exec_tool(c) for c in tool_calls])
+results = await asyncio.gather(*[_run_one(c) for c in tool_calls])
 ```
-当一轮有多个独立工具调用（如同时查天气+算时间）时，并发能减少总耗时。当前顺序是为简化错误处理；生产可加并发 + per-tool 超时。
+当一轮有多个独立工具调用（如同时查天气+算时间）时，并发能把总耗时从"求和"降到"取最大"。
+每个 call 走独立的 `_run_one` 流水线（策略检查 → 审批 → 执行），单个工具失败不影响其他结果返回。
+（历史：早期是顺序执行为简化错误处理，后来才改并发——若被追问"为什么当时顺序"，答"先保正确再保快"。）
 
 ### Q7: 你说用 Redis 做限流，具体怎么做？
 
@@ -131,9 +138,9 @@ Redis 单线程模型保证原子性，适合分布式限流。
 3. **数据泄露**：委托时可能泄露敏感信息 → 脱敏后再委托
 4. **成本**：无限委托循环 → recursion_limit 限制
 
-### Q16: 为什么 mcp 锁 1.29 不用 2.0？
+### Q16: 为什么 mcp 约束 <2.0 不用 2.0？
 
-**答**：`langchain-mcp-adapters`（官方桥接库，最新 0.3.1）至今用 mcp 1.x 的 `RequestContext`，**未适配 mcp 2.0**（2026-07 大重构）。强行用 2.0 会导入崩溃。已用 `mcp>=1.24.0,<2.0` 约束并注释。这是工程现实：追新不能违背兼容性。待官方适配后解除。
+**答**：`langchain-mcp-adapters`（官方桥接库，当前 0.3.1）至今用 mcp 1.x 的 `RequestContext`，**未适配 mcp 2.0**（2026-07 大重构）。强行用 2.0 会导入崩溃。所以约束是 `mcp>=1.24.0,<2.0`（下限保证 API 稳定，上限挡住 2.0 破坏性变更；当前装的是 1.29.0）。这是工程现实：追新不能违背兼容性。待官方适配后解除。
 
 ---
 
@@ -156,7 +163,7 @@ Redis 单线程模型保证原子性，适合分布式限流。
 
 **答**：
 - **类型注解**全程 + pydantic 校验
-- **两层测试**：25 个单元测试（纯逻辑，2.5s）+ 8 个集成测试（HTTP 端到端）
+- **多层测试**：190 条收集用例（单元/契约/安全边界/性能回归），全套约 6s，零外部依赖（conftest 把四个数据库指向黑洞端口）
 - **验证脚本** per Phase（verify_phaseN.py），无 DB/key 也能验核心逻辑
 - **ruff** lint + 格式化
 - **结构化日志** + trace_id 全链路追踪
@@ -168,7 +175,7 @@ Redis 单线程模型保证原子性，适合分布式限流。
 - **结构化日志**：每条含 trace_id（每请求生成），可串起全链路
 - **对话日志**：MongoDB 记录每轮事件（输入/输出/工具/token/耗时），可审计
 - **token 统计**：LLM 响应带 usage，可算成本
-- 不足与改进：未接 LangSmith/OpenTelemetry 分布式追踪（Phase 后续）
+- **OpenTelemetry 已接入**：`app/core/telemetry.py` 全套 span 体系（`agent.turn` / `context.build` / `llm.chat` / `tool.execute`，GenAI 语义约定命名），OTLP 导出到 Jaeger，`OTEL_ENABLED` 开关
 
 ### Q21: 如果让你加一个"对话总结"功能，怎么做？
 
@@ -215,7 +222,7 @@ Redis 单线程模型保证原子性，适合分布式限流。
 **答**：架构已具备生产基线，还差运维侧：
 - **HTTPS/反代**：Nginx + TLS（代码已支持）
 - **容器编排**：K8s + Helm（应用无状态，可水平扩）
-- **分布式追踪**：接 OpenTelemetry（已有结构化日志 + trace_id 基础）
+- **分布式追踪**：✅ 已接 OpenTelemetry（span 树 + Jaeger），生产补采样策略与告警即可
 - **真实 embedding**：RAG/记忆的哈希 embed 换成真实模型
 - **告警**：基于 /metrics 配 Prometheus + AlertManager
 - **CI/CD**：已有测试基础，加 GitHub Actions 自动化

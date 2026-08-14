@@ -210,6 +210,7 @@ class TestBwrapArgv:
 
 
 class TestPrivateTmp:
+    @pytest.mark.skipif(os.name == "nt", reason="Windows 不映射 POSIX 权限位（st_mode 恒为 777），权限语义由 ACL 保证")
     def test_tmp_is_private_not_shared(self):
         """不能把整个 /tmp 授予写权限——那样别人放在 /tmp 的凭据就都能读。"""
         import tempfile

@@ -34,7 +34,10 @@ class MockStreamLLM:
     async def chat(self, request: ChatRequest) -> ChatResponse:
         """非流式：返回工具调用（天气查询场景）。"""
         self._call_count += 1
-        last = request.messages[-1] if request.messages else None
+        # agent_node 会在对话末尾追加「[当前时间：...]」HumanMessage 作为环境参考，
+        # 判断消息角色时要先过滤掉它（与 test_api_smoke 的 mock 保持一致）
+        msgs = [m for m in request.messages if not (m.role == "user" and (m.content or "").startswith("[当前时间："))]
+        last = msgs[-1] if msgs else None
         if last and last.role == "tool":
             # 工具结果后，返回最终自然语言回复
             return ChatResponse(
@@ -44,7 +47,7 @@ class MockStreamLLM:
                 finish_reason="stop",
             )
         # 首轮：决定调用天气工具
-        user_msg = next((m.content for m in reversed(request.messages) if m.role == "user"), "")
+        user_msg = next((m.content for m in reversed(msgs) if m.role == "user"), "")
         if "天气" in (user_msg or "") and request.tools:
             return ChatResponse(
                 tool_calls=[ToolCall(id="c1", name="get_weather", arguments={"city": "北京"})],
@@ -54,26 +57,36 @@ class MockStreamLLM:
         return ChatResponse(content="你好，我是助手。", model="mock-stream", finish_reason="stop")
 
     async def stream_chat(self, request: ChatRequest):
-        """流式：逐 token 返回（模拟真实 LLM 的逐字产出）。"""
-        # 复用 chat 的逻辑确定要返回什么
+        """流式：逐 token 产文本，收尾 chunk 携带聚合结果。
+
+        契约（与真实 provider 一致）：tool_calls / usage 只出现在流末尾的
+        收尾 chunk 上——agent_node 一次流式请求同时拿到文本与工具决策。
+        """
         resp = await self.chat(request)
         if resp.tool_calls:
-            # 工具调用：不产文本 token
-            yield StreamChunk(content="", finish_reason="tool_calls")
+            yield StreamChunk(
+                content="",
+                tool_calls=resp.tool_calls,
+                finish_reason="tool_calls",
+            )
             return
         # 文本回复：逐字 yield（模拟 token 流）
         text = resp.content or ""
-        # 按字符模拟 token
-        tokens = list(text)
-        for i, tok in enumerate(tokens):
-            is_last = i == len(tokens) - 1
-            yield StreamChunk(content=tok, finish_reason="stop" if is_last else None)
+        for i, tok in enumerate(text):
+            yield StreamChunk(content=tok)
+        yield StreamChunk(
+            content="",
+            usage=resp.usage,
+            finish_reason="stop",
+        )
 
 
 async def main():
     # 注入 mock LLM
     import app.llm.factory as factory
-    factory.get_llm_client = lambda provider=None: MockStreamLLM()
+    # 共享单例：让调用计数可观测（每次 new 实例会把计数打散）
+    mock_llm = MockStreamLLM()
+    factory.get_llm_client = lambda provider=None: mock_llm
 
     from app.agent.graph import stream_agent
 
@@ -118,12 +131,22 @@ async def main():
     done_event = events[-1]
     assert "晴朗" in done_event["reply"] or "26" in done_event["reply"], "✗ done 的 reply 不完整"
 
+    # ★ 单次调用断言（流式 tool_calls 聚合优化的核心证据）：
+    # 本次对话共 2 个 agent 步骤（决策调工具 → 工具后总结），
+    # mock 的 stream_chat 内部复用 chat() 判断逻辑，每步恰好 1 次。
+    # 若退化回「流式出文本 + chat() 复查」的双调用，计数会是 4。
+    assert mock_llm._call_count == 2, (
+        f"✗ LLM 调用次数异常：{mock_llm._call_count}（预期 2 = 每步 1 次；"
+        f"若为 4 说明退化为双调用，延迟/成本翻倍）"
+    )
+
     print()
     print("✅ 真·token 流式验证通过！")
     print(f"   • 逐 token 推送（{token_count} 个 token）")
     print("   • 工具调用中间步骤推送（tool_calls/start/result）")
     print("   • done 事件含完整回复")
     print("   • 事件顺序: token流 → tool_calls → tool_start → tool_result → token流 → done")
+    print(f"   • 单次调用验证：2 个 agent 步骤 = {mock_llm._call_count} 次 LLM 调用（无复查冗余）")
 
 
 if __name__ == "__main__":

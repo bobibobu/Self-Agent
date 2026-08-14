@@ -45,8 +45,12 @@ class LLMClient(Protocol):
 
     async def chat(self, request: ChatRequest) -> ChatResponse: ...
 
-    async def stream_chat(self, request: ChatRequest) -> ChatStream: ...
+    def stream_chat(self, request: ChatRequest) -> ChatStream: ...
+    # ↑ 刻意不是 async def：它返回异步迭代器，本身就是普通方法
 ```
+
+> `chat` 是 `async def`（等待完整响应），`stream_chat` 是**普通方法返回异步生成器**
+> （`async for chunk in llm.stream_chat(req)`）——这是 Protocol 里少数签名不对称的地方。
 
 用 `Protocol`（结构化子类型）而非抽象基类：provider 实现无需继承，**鸭子类型**即可，降低耦合。
 

@@ -74,13 +74,13 @@ async def main():
     print("=" * 60)
     print("验证 4：记忆/画像注入系统提示")
     print("=" * 60)
-    from app.agent.graph import _build_system_message_with_memory
+    from app.agent.graph import _build_system_prompt_with_context
 
-    sys_msg = await _build_system_message_with_memory("编程偏好", "user1")
-    assert "长期记忆" in sys_msg.content, "✗ 长期记忆未注入"
-    assert "用户画像" in sys_msg.content, "✗ 用户画像未注入"
-    assert "人工智能" in sys_msg.content, "✗ 兴趣未注入"
-    print(f"  系统提示长度: {len(sys_msg.content)} 字符")
+    sys_content = await _build_system_prompt_with_context("编程偏好", "user1")
+    assert "长期记忆" in sys_content, "✗ 长期记忆未注入"
+    assert "用户画像" in sys_content, "✗ 用户画像未注入"
+    assert "人工智能" in sys_content, "✗ 兴趣未注入"
+    print(f"  系统提示长度: {len(sys_content)} 字符")
     print("  ✓ 长期记忆 + 用户画像 已注入系统提示")
 
     print()

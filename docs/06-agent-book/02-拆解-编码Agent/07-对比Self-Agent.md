@@ -40,6 +40,10 @@ Aider 也支持多模型，但 Self-Agent 的统一抽象层（LLMClient Protoco
 
 本地 CLI（零依赖 SQLite）+ 服务端（四数据库）。这四家里只有 Self-Agent 同时是「本地工具」和「可部署服务」。
 
+### 性能有实测底账（2026-08 基准）
+
+四家对比文章都不会给你 QPS 数字，Self-Agent 有：框架层单 worker 新会话 ~680 rps / 长会话 ~475 rps（mock LLM 隔离测框架上限）；真实 GLM 下 TTFT 1.8s、token 间隔 27ms、瓶颈定位在 provider 而非框架（并发 10 = 2.5 rps）。三处热路径缓存优化后长会话吞吐 +27%、p50 -33%。数据与测法见 [性能基准报告](../../04-guides/性能基准报告.md)——"能被追问出测法的数字"和"拍脑袋的数字"是两种可信度。
+
 ### 协议化扩展（全书第 10 章）
 
 MCP + A2A + Skill 三合一。Cline 是 MCP 一等公民，但 Self-Agent 多了 A2A（agent 间协作）和 Skill（能力封装）。

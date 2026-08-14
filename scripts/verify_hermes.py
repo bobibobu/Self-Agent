@@ -54,6 +54,10 @@ class HermesMockLLM:
 
 
 async def main():
+    # 记录运行前已有的提示词版本（结束时清理本次新增，防污染 prompt_store）
+    from app.evolution.prompt_store import list_versions
+    pre_versions = {v["version"] for v in list_versions(limit=1000)}
+
     import app.llm.factory as factory
     factory.get_llm_client = lambda provider=None: HermesMockLLM()
 
@@ -125,9 +129,9 @@ async def main():
     print("=" * 60)
     print("验证 3：系统提示词动态读取")
     print("=" * 60)
-    from app.agent.graph import _build_system_message
-    msg = _build_system_message()
-    print(f"  系统提示词长度: {len(msg.content)} 字符")
+    from app.agent.graph import _build_system_prompt
+    content = _build_system_prompt()
+    print(f"  系统提示词长度: {len(content)} 字符")
     print("  ✓ 系统提示词从 prompt_store 动态读取（Hermes 优化后自动生效）")
 
     print()
@@ -137,6 +141,30 @@ async def main():
     print("  能力 B：反思+提示词自优化（版本管理+回滚）")
     print("  系统提示词动态生效")
     print("=" * 60)
+
+    _cleanup_test_prompts(pre_versions)
+
+
+def _cleanup_test_prompts(keep_versions: set[str]) -> None:
+    """清理本次测试写入的提示词版本，防止污染 prompt_store（真实运行的系统提示）。"""
+    import json
+    from pathlib import Path
+    from app.evolution.prompt_store import _PROMPTS_DIR, _CURRENT_FILE
+
+    if not _PROMPTS_DIR.exists():
+        return
+    removed = 0
+    for f in _PROMPTS_DIR.glob("v*.json"):
+        if f.stem not in keep_versions:
+            f.unlink()
+            removed += 1
+    # current 指向的版本若被删，则一并清除（回退内置默认）
+    if _CURRENT_FILE.exists():
+        data = json.loads(_CURRENT_FILE.read_text(encoding="utf-8"))
+        if data.get("version", "") not in keep_versions:
+            _CURRENT_FILE.unlink()
+    if removed:
+        print(f"（已清理 {removed} 个测试提示词版本）")
 
 
 if __name__ == "__main__":

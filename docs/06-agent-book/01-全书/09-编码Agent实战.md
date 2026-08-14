@@ -32,7 +32,7 @@ Phase 10 之前，Self-Agent 是个「能聊天并调几个玩具工具」的聊
 | `read_file(path, start_line, end_line)` | 带行号读取，支持行范围 |
 | `list_dir(path)` | 列目录，跳过 .git/node_modules |
 | `glob_files(pattern)` | 通配符查找 |
-| `grep_files(pattern, path)` | 字面量内容搜索，跳过二进制和敏感文件 |
+| `grep_files(query, file_pattern="**/*", ignore_case=True)` | 字面量内容搜索，跳过二进制和敏感文件 |
 
 遍历类有上限（`_MAX_ENTRIES=200`、`_MAX_GREP_HITS=100`），防止在大仓库刷屏并撑爆上下文。
 
@@ -77,7 +77,8 @@ async def read_file(path: str, start_line: int = 1, end_line: int = 0) -> str:
 
 ```python
 @tool
-async def run_command(command: str, timeout: int = 120) -> str:
+async def run_command(command: str, cwd: str = ".") -> str:
+# 超时不走参数，来自配置 shell_timeout_seconds（默认 120s）
     """执行一条命令（不经 shell 解释器）。"""
     # 1. shlex 拆词，列表参数（防注入，第 8 章）
     # 2. _looks_destructive(argv) 挡毁灭性命令

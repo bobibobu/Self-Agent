@@ -51,19 +51,44 @@ def lc_to_chat_messages(messages: list[BaseMessage]) -> list[ChatMessage]:
     return out
 
 
+# 工具 schema 缓存：name+description+schema类 → ToolDefinition。
+# 工具注册表在运行期基本静态（启动时注册，MCP 发现后固定），
+# 而 model_json_schema 是纯 CPU 的 Pydantic 遍历——实测占 /chat 热路径
+# 近两成 CPU（14 个工具 × 每次 LLM 调用）。
+# key 里带上 schema 类本身（langchain 的 args_schema 就是 Pydantic 模型类）：
+# 同一工具重复调用命中；换了 schema 类（如 MCP 重建工具）自动失效重算。
+# 注意不能写 type(args_schema)——所有 Pydantic 模型的元类都是同一个
+# ModelMetaclass，起不到区分作用（tests/test_perf_optimizations.py 锁此行为）。
+_tool_def_cache: dict[tuple[str, str, Any], ToolDefinition] = {}
+_TOOL_DEF_CACHE_MAX = 512
+
+
+def _tool_definition_cached(t: Any) -> ToolDefinition:
+    name = getattr(t, "name", str(t))
+    description = getattr(t, "description", "")
+    args_schema = getattr(t, "args_schema", None)
+    # 只有 schema 是类（标准 Pydantic 用法）才可安全做缓存 key；
+    # 少见的实例型 schema 不缓存，直接现算
+    cacheable = isinstance(args_schema, type)
+    key = (name, description, args_schema) if cacheable else None
+    if key is not None:
+        cached = _tool_def_cache.get(key)
+        if cached is not None:
+            return cached
+    schema: dict[str, Any] = {}
+    if args_schema is not None:
+        schema = args_schema.model_json_schema() if hasattr(args_schema, "model_json_schema") else {}
+    defn = ToolDefinition(name=name, description=description, parameters=schema)
+    if key is not None:
+        if len(_tool_def_cache) >= _TOOL_DEF_CACHE_MAX:
+            _tool_def_cache.clear()
+        _tool_def_cache[key] = defn
+    return defn
+
+
 def build_tool_definitions(tools: list[Any]) -> list[ToolDefinition]:
     """把 langchain @tool 工具转成统一的 ToolDefinition（OpenAI function schema）。"""
-    defs: list[ToolDefinition] = []
-    for t in tools:
-        # langchain BaseTool 暴露 name / description / args_schema
-        name = getattr(t, "name", str(t))
-        description = getattr(t, "description", "")
-        schema: dict[str, Any] = {}
-        args_schema = getattr(t, "args_schema", None)
-        if args_schema is not None:
-            schema = args_schema.model_json_schema() if hasattr(args_schema, "model_json_schema") else {}
-        defs.append(ToolDefinition(name=name, description=description, parameters=schema))
-    return defs
+    return [_tool_definition_cached(t) for t in tools]
 
 
 def build_chat_request(

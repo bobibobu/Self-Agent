@@ -53,8 +53,9 @@ async def agent_node(state: AgentState, config: RunnableConfig, writer: StreamWr
     response_format = configurable.get("response_format")
 
     # 上下文窗口管理：消息过长时自动压缩早期消息为摘要
+    # （传 thread_id 启用摘要缓存：长会话不再每轮重摘，见 context_manager）
     from app.agent.context_manager import compress_if_needed
-    messages = await compress_if_needed(state["messages"])
+    messages = await compress_if_needed(state["messages"], thread_key=configurable.get("thread_id"))
 
     # 系统提示只在「发给 LLM 的这一份」里出现，不写回 state——
     # 否则 add_messages 每轮追加一条，历史里会堆积 N 份系统提示

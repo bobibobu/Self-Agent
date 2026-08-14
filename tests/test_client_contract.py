@@ -277,13 +277,17 @@ class TestCliAuthSupport:
         assert " " not in captured["url"], "URL 里不该出现裸空格"
         assert captured["auth"] == "Bearer tok"
 
+    @pytest.mark.skipif(os.name == "nt", reason="Windows 不映射 POSIX 权限位（chmod 0600 无效），凭据保护由用户目录 ACL 保证")
     def test_credentials_saved_with_owner_only_permission(self, tmp_path, monkeypatch):
         """token 等同于密码，落盘必须是 0600。"""
         import stat
 
-        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        # 自包含导入路径：不依赖兄弟测试的 sys.path.insert 副作用（测试隔离原则）
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), "clients", "cli"))
         from selfagent_cli.config import _credentials_path, load_credentials, save_credentials
 
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
         save_credentials("tok-123", {"id": "u1", "username": "alice"})
         path = _credentials_path()
         mode = stat.S_IMODE(path.stat().st_mode)

@@ -36,7 +36,7 @@ RAG 知识库、用量统计等企业能力。
 | **真·token 流式** | 单次流式调用同时拿到文本与 tool_calls，不做二次采样 |
 | **任务计划** | `update_plan` 工具维护 TODO 记事板，随 checkpointer 持久化 |
 | **人在回路** | 写文件 / 执行命令前 `interrupt()` 挂起，用户决策后 `Command(resume=)` 续跑 |
-| **上下文压缩** | 消息超阈值自动摘要早期对话 |
+| **上下文压缩** | 消息超阈值自动摘要早期对话；per-thread 摘要缓存 + 迟滞窗口，长会话不每轮重摘 |
 | **流式中断** | 协作式取消标志，可中途停止生成 |
 
 ### 1.2 编码能力
@@ -256,12 +256,12 @@ Self-Agent/
 │   │   ├── state.py              # AgentState（messages + plan）
 │   │   ├── plan.py               # 任务计划工具与校验
 │   │   ├── registry.py           # 工具注册表 + 风险分级
-│   │   ├── context_manager.py    # 上下文压缩
+│   │   ├── context_manager.py    # 上下文压缩（摘要缓存 + 迟滞）
 │   │   ├── cancel_registry.py    # 流式中断
 │   │   ├── nodes/
 │   │   │   ├── agent_node.py     # 调 LLM，流式产出 + 聚合 tool_calls
 │   │   │   ├── tools_node.py     # 并发执行工具 + 审批闸门
-│   │   │   └── bridge.py         # LangChain 消息 ↔ 统一 LLM 模型
+│   │   │   └── bridge.py         # LangChain 消息 ↔ 统一 LLM 模型；工具 schema 缓存
 │   │   ├── tools/
 │   │   │   ├── __init__.py       # 内置工具（计算器/时间/天气）
 │   │   │   ├── files.py          # 文件读写搜索
@@ -304,9 +304,12 @@ Self-Agent/
 ├── infra/
 │   ├── docker-compose.yml        # 4 个数据库 + Jaeger
 │   └── postgres/                 # init.sql + migrations/
-├── tests/                        # 168 条测试
+├── tests/                        # 190+ 条测试
 │   ├── conftest.py               # 测试隔离（禁止写真实库）
 │   ├── test_unit.py              # 单元
+│   ├── test_perf_optimizations.py # 性能优化回归（schema/摘要/提示词缓存）
+│   ├── test_prompt_caching.py     # 提示词缓存前缀
+│   ├── test_structured_output.py  # 结构化输出契约
 │   ├── test_api_smoke.py         # HTTP 冒烟
 │   ├── test_regressions.py       # 历史缺陷回归
 │   ├── test_client_contract.py   # 前后端协议契约
@@ -380,7 +383,8 @@ Self-Agent/
 
 ```bash
 pip install -e ".[dev]"
-pytest tests/ -q          # 168 passed，约 6 秒
+pytest tests/ -q          # 184 passed，约 6 秒
+python scripts/benchmark.py # 性能基准（框架层 QPS），报告见 docs/04-guides/性能基准报告.md
 ruff check app/ tests/ scripts/ clients/cli
 ```
 

@@ -89,7 +89,7 @@ def should_use_tools(state) -> str:
 
 ## 4.3 完整的图组装
 
-`app/agent/graph.py:282` 的 `get_compiled_graph()`，十几行：
+`app/agent/graph.py:306` 的 `get_compiled_graph()`，十几行：
 
 ```python
 async def get_compiled_graph():
@@ -263,7 +263,7 @@ LangGraph 按 thread_id 读回 State，**从 interrupt() 那一行继续**，`de
 
 ## 4.9 流式：custom + updates 双模式
 
-LangGraph 的流式输出有点特殊。本项目用**两种 stream_mode 组合**（`graph.py:435`）：
+LangGraph 的流式输出有点特殊。本项目用**两种 stream_mode 组合**（`graph.py:462`）：
 
 ```python
 async for chunk in graph.astream(

@@ -134,7 +134,7 @@ chunk3: (结束)
 
 ### 解决
 
-`app/llm/providers/openai_like.py:166` 的 `stream_chat` 内部按 index 聚合：
+`app/llm/providers/openai_like.py:170` 的 `stream_chat` 内部按 index 聚合：
 
 ```python
 acc: dict[int, dict[str, Any]] = {}  # index → {id, name, args_buf}

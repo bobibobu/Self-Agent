@@ -96,7 +96,7 @@ python -m app.mcp.server --http   # streamable-http 传输（远程可访问）
 - `stdio`：本地子进程（最常用，如官方文件系统、GitHub server）
 - `http`：streamable-http（远程，跨网络）
 
-**优雅降级**：某个 server 连不上只告警，不影响其他和 Agent 整体运行。
+**降级行为（当前实现）**：MCP 工具发现是整批的——任何一个 server 连不上，本轮所有 MCP 工具都会被丢弃（内置工具不受影响，Agent 整体仍可用），启动日志有 WARNING。按 server 粒度隔离失败是已知改进项（`app/mcp/client.py` 的 connect()）。
 
 ---
 

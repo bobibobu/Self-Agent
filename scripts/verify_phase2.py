@@ -30,7 +30,8 @@ class MockLLM:
         return "mock"
 
     async def chat(self, request: ChatRequest) -> ChatResponse:
-        last = request.messages[-1] if request.messages else None
+        msgs = [m for m in request.messages if not (m.role == "user" and (m.content or "").startswith("[当前时间："))]
+        last = msgs[-1] if msgs else None
         if last and last.role == "tool":
             return ChatResponse(
                 content=f"计算完成：{last.content[:50]}",
@@ -38,7 +39,7 @@ class MockLLM:
                 model="mock",
                 finish_reason="stop",
             )
-        user_msg = next((m.content for m in reversed(request.messages) if m.role == "user"), "")
+        user_msg = next((m.content for m in reversed(msgs) if m.role == "user"), "")
         # 检查系统提示里是否有 Skill 提示词（验证注入）
         sys_msgs = [m.content for m in request.messages if m.role == "system"]
         _ = " ".join(sys_msgs)
@@ -55,7 +56,14 @@ class MockLLM:
         return ChatResponse(content="你好", model="mock", finish_reason="stop")
 
     async def stream_chat(self, request):
-        yield StreamChunk(content="ok", finish_reason="stop")
+        """流式契约（与真实 provider 一致）：收尾 chunk 携带聚合 tool_calls/usage。"""
+        resp = await self.chat(request)
+        if resp.tool_calls:
+            yield StreamChunk(content="", tool_calls=resp.tool_calls, finish_reason="tool_calls")
+            return
+        for ch in (resp.content or ""):
+            yield StreamChunk(content=ch)
+        yield StreamChunk(content="", usage=resp.usage, finish_reason="stop")
 
 
 async def main():
@@ -89,11 +97,11 @@ async def main():
     print("=" * 60)
     print("验证 2：Skill 提示词片段注入系统提示")
     print("=" * 60)
-    from app.agent.graph import _build_system_message
-    sys_msg = _build_system_message()
-    assert "数学助手已激活" in sys_msg.content, "✗ Skill 提示词未注入"
+    from app.agent.graph import _build_system_prompt
+    sys_content = _build_system_prompt()
+    assert "数学助手已激活" in sys_content, "✗ Skill 提示词未注入"
     print("  ✓ 系统提示已包含 Skill 专属提示词片段")
-    print(f"  系统提示长度: {len(sys_msg.content)} 字符")
+    print(f"  系统提示长度: {len(sys_content)} 字符")
 
     print()
     print("=" * 60)

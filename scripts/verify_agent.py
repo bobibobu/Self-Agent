@@ -35,7 +35,8 @@ class MockLLMClient:
     async def chat(self, request: ChatRequest) -> ChatResponse:
         self._call_count += 1
         # 检查最后一条消息：如果是 tool 结果，说明工具已执行，给最终回复
-        last = request.messages[-1] if request.messages else None
+        msgs = [m for m in request.messages if not (m.role == "user" and (m.content or "").startswith("[当前时间："))]
+        last = msgs[-1] if msgs else None
         if last and last.role == "tool":
             return ChatResponse(
                 content=f"根据工具结果（{last.content[:30]}），我已经帮你处理好了。",
@@ -45,7 +46,7 @@ class MockLLMClient:
             )
         # 否则发起工具调用（模拟 LLM 决定调用 get_weather）
         # 根据用户消息选择工具
-        user_msg = next((m.content for m in reversed(request.messages) if m.role == "user"), "")
+        user_msg = next((m.content for m in reversed(msgs) if m.role == "user"), "")
         if "天气" in (user_msg or "") and request.tools:
             tool = next((t for t in request.tools if t.name == "get_weather"), None)
             if tool:
@@ -59,14 +60,15 @@ class MockLLMClient:
         return ChatResponse(content="你好！我是 Self-Agent，有什么可以帮你？", model="mock-1", finish_reason="stop")
 
     async def stream_chat(self, request: ChatRequest):
-        """流式：复用 chat 逻辑，工具调用不产文本，文本逐 token。"""
+        """流式契约（与真实 provider 一致）：收尾 chunk 携带聚合 tool_calls/usage。"""
         resp = await self.chat(request)
         if resp.tool_calls:
-            yield StreamChunk(content="", finish_reason="tool_calls")
+            yield StreamChunk(content="", tool_calls=resp.tool_calls, finish_reason="tool_calls")
             return
         text = resp.content or ""
-        for i, ch in enumerate(text):
-            yield StreamChunk(content=ch, finish_reason="stop" if i == len(text) - 1 else None)
+        for ch in text:
+            yield StreamChunk(content=ch)
+        yield StreamChunk(content="", usage=resp.usage, finish_reason="stop")
 
 
 async def main():
