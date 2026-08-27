@@ -23,6 +23,10 @@
 | **7** | [📕 底层原理](08-底层原理/00-总览.md) | 独立成书 | Transformer/Attention/KV Cache/向量索引/推理引擎/采样量化的「为什么」+ 手撕题详解 |
 | **8** | [🖼 多模态 Agent](09-多模态/00-总览.md) | 独立成书 | 图片/视频/GUI 操作：多模态 API 传图、Self-Agent 改造方案、Computer Use/Browser Use |
 
+## 🗓 进阶学习计划（下一步）
+
+读完书之后做什么？→ **[进阶学习计划](10-进阶学习计划.md)**：以 12 个本地开源项目（`D:\GitProject` 下的 langgraph / ragflow / deer-flow / hermes-agent / strix 等）为教材，分四阶段（编排内核 → 记忆与 RAG → Super Agent → 安全与生产化），每阶段都落一次对 Self-Agent 的真实改动，周期约 6 个月。
+
 ## 附录：面试准备专题
 
 | 专题 | 内容 |
