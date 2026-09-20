@@ -74,6 +74,20 @@ class Settings(BaseSettings):
     embedding_model: str = ""   # 留空用 provider 默认（glm: embedding-3 / openai: text-embedding-3-small）
     embedding_dims: int = 0     # 留空用 provider 默认（glm: 2048 / openai: 1536）
 
+    # ---------- RAG 知识库 ----------
+    # Hybrid 检索：向量语义检索 + 关键词子串检索（Postgres ILIKE，CJK 二元组）
+    # 两路结果用 RRF 融合。Postgres 不可用时自动退化为纯向量检索（现状行为）。
+    rag_hybrid_search: bool = True
+    # Contextual 分块（Anthropic Contextual Retrieval 思路）：入库时用 LLM 给每块
+    # 生成一句「本块在全文中的位置与主题」前缀再向量化，消除孤立块的歧义。
+    # 仅配置了 LLM key 时生效；每块一次 flash 模型调用，失败自动回退原始块。
+    rag_contextual_chunking: bool = True
+    # 单次 ingest 最多做上下文增强的块数——防大文档把 ingest 拖成几千次 LLM 调用
+    rag_contextual_max_chunks: int = 64
+    # 上下文增强用的模型。留空跟随 LLM_DEFAULT_PROVIDER 的默认模型。
+    # 注意：GLM 4.5 系列默认开思考模式，本功能已自动关闭思考；如仍嫌慢可换轻量模型。
+    rag_contextual_model: str = ""
+
     # ---------- PostgreSQL ----------
     postgres_host: str = "localhost"
     postgres_port: int = 5432
@@ -203,6 +217,10 @@ class Settings(BaseSettings):
     upload_max_size_mb: int = 20
 
     # ---------- 便捷派生属性 ----------
+    # 运行时热替换（/admin/llm-config）把新 key 写回哪个 env 文件。
+    # 与上面 model_config 的 env_file 是两回事：那个管启动时读，这个管运行时写。
+    env_file_path: str = ".env"
+
     @property
     def postgres_dsn(self) -> str:
         """异步 Postgres 连接串（asyncpg 格式，纯 postgresql://）。"""

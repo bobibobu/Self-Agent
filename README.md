@@ -12,10 +12,12 @@
 
 - **多协议 LLM 抽象层**：统一封装 GLM(智谱)、OpenAI、Anthropic 三套主流协议，GLM 走 OpenAI 兼容协议零适配接入
 - **LangGraph 状态图编排**：基于最新 LangGraph 1.x 的 ReAct Agent，原生支持短期/长期记忆、子图、人机协同
-- **MCP 工具生态**：基于官方 MCP 协议，既能暴露自身工具给外部 Agent，也能调用第三方 MCP 服务
+- **Hybrid RAG 知识库**：向量+关键词两路 RRF 融合检索，Contextual 分块（LLM 生成块上下文）消除孤立块歧义，检索同时是 Agent 工具（Agentic RAG，模型按需调用可多轮迭代）
+- **MCP 工具生态**：基于 MCP 2.x 规范（2026-07-28 大版本，langchain.mcp + fastmcp 4.x），既能暴露自身工具给外部 Agent，也能调用第三方 MCP 服务
 - **A2A 协议互通**：基于 Google/Linux Foundation 的 A2A 标准，实现 Agent 间发现与协作
 - **多类型记忆系统**：PostgreSQL(对话状态/长期记忆) + Redis(缓存) + Neo4j(用户画像图谱) + MongoDB(日志)
 - **企业级工程化**：全程类型注解、结构化日志、配置即代码、Docker 一键起所有基础设施
+- **LLM 配置热替换**：`POST /admin/llm-config` 在线换 key/模型/默认 provider，**不重启立即生效**（缓存客户端自动失效），写回 .env 持久化；embedding 维度变化时自动提示重建索引
 - **可观测**：OpenTelemetry 链路追踪，一轮对话的 LLM 调用 / 工具执行 / 检索耗时一目了然
 - **编码 Agent**：工作区禁闭 + 文件/Shell 工具 + 执行前审批 + 命令沙箱 + 任务计划
 
@@ -25,9 +27,10 @@
 |---|---|
 | Agent 编排 | LangGraph 1.x |
 | LLM | GLM / OpenAI / Anthropic（统一抽象） |
+| RAG | Hybrid 检索（pgvector + 关键词，RRF 融合）· Contextual 分块 · Agentic 检索工具 |
 | Web | FastAPI + Uvicorn + SSE 流式 |
 | 数据库 | PostgreSQL · MongoDB · Redis · Neo4j |
-| 协议 | MCP · A2A |
+| 协议 | MCP 2.x（langchain.mcp + fastmcp 4）· A2A |
 | 可观测 | OpenTelemetry（GenAI 语义约定）· Jaeger |
 | 编码能力 | 工作区禁闭 · 文件读写 · Shell 执行 · 审批闸门 · 沙箱隔离 · 任务计划 |
 | 包管理 | uv |
@@ -113,13 +116,29 @@ Self-Agent/
 └── tests/                # 测试（单元 + 集成）
 ```
 
-## 💬 三种交互方式
+## 💬 四种交互方式
+
+### 0. 桌面客户端（推荐起步）⭐
+
+类 ZCode / Codex 的形态：选项目目录 → 原生窗口里让 Agent 干活。
+本地单机运行，不需要 Docker 和数据库（状态存 SQLite）。
+
+```bash
+uv run python clients/desktop/app.py
+```
+
+写文件、执行命令前弹审批确认框；任务计划实时打勾。详见 [clients/desktop/README.md](clients/desktop/README.md)。
 
 ### 1. Web 聊天页（React）
+
 ```bash
+# 服务端形态（需先起 infra 基础设施）
+uv run uvicorn app.main:app --reload
+# 前端（开发模式）或直接访问 http://localhost:8000/（已托管构建产物）
 cd clients/web && npm install && npm run dev   # → http://localhost:5173
 ```
-真·token 流式打字机效果 + 工具调用实时展示。
+
+真·token 流式打字机效果 + 工具调用实时展示 + 审批弹窗 + 任务计划面板。
 
 ### 2. 命令行 CLI —— **本地模式（默认）**
 ```bash
@@ -168,6 +187,7 @@ curl -X POST http://localhost:8000/chat/http-stream ... # NDJSON 流式
 
 - **[从零读懂 Self-Agent](docs/00-overview/02-从零读懂.md)** ← 零基础从这里开始
 - **[项目总览：功能点 · 使用说明 · 项目结构](docs/00-overview/README.md)** ← 参考手册
+- **[启动指南：桌面 / 服务端 / Web / CLI 四种形态](docs/03-development/02-启动指南.md)** ← 怎么跑起来
 - **[📘 Agent 开发学习书架](docs/06-agent-book/README.md)** ← 系统学习 Agent 开发（基础全书 + 4 本开源项目拆解，含状态/记忆/安全/协议全领域，附「状态的真相」「外部世界怎么做」等深度章节）
 - [架构总览](docs/01-architecture/README.md)
 - [环境搭建指南](docs/03-development/01-setup.md)

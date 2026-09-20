@@ -9,25 +9,66 @@
 ### 解决什么问题
 LLM 只知道预训练数据。要让 Agent 基于你的**私有文档**回答（产品手册、内部知识、FAQ），就需要 RAG。
 
-### 流程
+### 流程（2026-09 升级后）
 ```
-上传文档 → 分块（chunking）→ 向量化（embedding）→ 存入向量库
-                                                    ↓
-对话时 → 按问题语义检索相关块 → 注入提示词 → LLM 结合资料回答
+上传文档 → 分块（滑动窗口，可选 contextual 前缀增强）→ 向量化 → 存入向量库
+                                                              ↓
+对话时 → ①系统提示注入检索（原路径，kb_ids 自动）        → LLM 结合资料回答
+        ②search_knowledge_base 工具（Agentic RAG，模型按需调用，可多轮迭代）
 ```
+
+### Hybrid 检索（向量 + 关键词，RRF 融合）
+原实现只有单路向量检索——孤立 chunk 脱离原文语境，专有名词/代号/编号这类
+「精确字面」查询经常排不进 top-k。现在检索走两条通道：
+
+- **向量通道**：`store.asearch(query=...)`，语义相近但字面不同的块
+- **关键词通道**：直接查 PostgresStore 的 `store` 表（prefix 等值定位本知识库，
+  `value->>'content'` 上 ILIKE 子串命中；CJK 查询切二元 bigram，
+  「机器学习」→ 机器/器学/学习，命中数天然构成相关度）
+- **融合**：Reciprocal Rank Fusion（RRF，k=60），两路排名取 `1/(k+rank)` 累加
+
+Postgres 不可用时自动退化为纯向量检索（升级前行为），检索结果带
+`match: ["dense", "keyword"]` 标记命中通道，便于观测。
+
+### Contextual 分块（Anthropic Contextual Retrieval 思路）
+入库时用 LLM 给每块生成一句「该片段讲什么、在文档中的位置」前缀，与原块
+拼接后再向量化——embedding 看到的是「有上下文的块」而非孤立段落。
+
+- 每块一次 LLM 调用：并发上限 8（`_CONTEXTUAL_CONCURRENCY`），总量帽
+  `RAG_CONTEXTUAL_MAX_CHUNKS`（默认 64），单块失败回退原始块，绝不阻断入库
+- **GLM 4.5 系列必须关思考模式**（`extra_body={"thinking":{"type":"disabled"}}`）：
+  推理模型的思考 token 会把一个 150 token 的小任务拖到 45s+ 超时
+- 存储字段：`content`=增强后文本（被向量化），`raw`=原始块
+
+### Agentic RAG（检索即工具）
+`search_knowledge_base` 注册为内置只读工具，模型自主决定何时检索、用什么
+query、要不要再检索一轮——把「每轮固定注入」的成本变成按需付出。
+
+- 知识库范围从图 config 的 `configurable` 注入（`kb_ids`/`tenant_id`，
+  见 `graph.py`），工具不接受 kb_ids 参数，模型无法越权检索未关联的知识库
+- 工具执行链路：`tools_node` 现在把图 config 传给 `tool.ainvoke(args, config=...)`，
+  声明了 `RunnableConfig` 参数的工具自动拿到请求级上下文
 
 ### 实现（复用已有基础设施）
 - **向量库**：复用 PostgresStore/InMemoryStore 的语义索引（`index={"embed":...}`）
 - **分块**：滑动窗口，500 字符/块，50 字符重叠（保上下文连贯）
-- **隔离**：每个知识库一个 namespace `("kb", kb_id)`
+- **隔离**：每个知识库一个 namespace `("kb", kb_id)`，多租户启用时带租户前缀
 
 ### 端点
 | 端点 | 说明 |
 |---|---|
-| `POST /rag/kb/{kb_id}` | 上传文档（自动分块+入库） |
-| `GET /rag/kb/{kb_id}/search?query=` | 语义检索 |
+| `POST /rag/kb/{kb_id}` | 上传文档（自动分块+入库，可选 contextual 增强） |
+| `GET /rag/kb/{kb_id}/search?query=` | Hybrid 检索（向量+关键词 RRF 融合） |
 | `DELETE /rag/kb/{kb_id}` | 删除知识库 |
-| `POST /chat` 带 `kb_ids` | 对话时自动检索增强 |
+| `POST /chat` 带 `kb_ids` | 对话时自动检索注入 + `search_knowledge_base` 工具按需检索 |
+
+### 配置
+| 环境变量 | 默认 | 说明 |
+|---|---|---|
+| `RAG_HYBRID_SEARCH` | `true` | 关键词通道开关（Postgres 不可用自动退化） |
+| `RAG_CONTEXTUAL_CHUNKING` | `true` | 入库时 LLM 生成块上下文前缀（无 key 自动跳过） |
+| `RAG_CONTEXTUAL_MAX_CHUNKS` | `64` | 单次 ingest 最多增强的块数 |
+| `RAG_CONTEXTUAL_MODEL` | 空 | 增强用的模型（留空跟随默认模型） |
 
 ### 用法
 ```bash

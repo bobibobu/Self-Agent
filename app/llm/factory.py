@@ -73,3 +73,12 @@ def get_llm_client(provider: ProviderName | None = None) -> LLMClient:
     s = get_settings()
     target = provider or s.llm_default_provider  # type: ignore[arg-type]
     return create_llm_client(target)  # type: ignore[arg-type]
+
+
+def reset_llm_clients() -> None:
+    """清空客户端缓存，让下一次调用按**当前**配置重建。
+
+    供运行时配置热替换（/admin/llm-config）调用：换 key / 换 provider 后
+    不重启进程即可生效。lru_cache 单例持有旧的 key，必须显式失效。
+    """
+    get_llm_client.cache_clear()

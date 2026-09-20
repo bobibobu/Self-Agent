@@ -11,6 +11,7 @@ Agent 框架执行工具 → 把结果回填给 LLM。
 - calculator：数学计算（安全的表达式求值）
 - get_current_time：获取当前时间
 - get_weather：模拟天气查询（演示用，可替换成真实 API）
+- search_knowledge_base：知识库混合检索（Agentic RAG，按需检索）
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from zoneinfo import ZoneInfo
 
 from langchain_core.tools import tool
 
+from app.agent.tools.kb import search_knowledge_base
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -131,12 +133,12 @@ def get_weather(city: str) -> str:
 
 
 # 暴露给 graph 注册的工具列表
-ALL_TOOLS = [calculator, get_current_time, get_weather]
+ALL_TOOLS = [calculator, get_current_time, get_weather, search_knowledge_base]
 
 # 工具名 → 工具函数 的映射，供 tools 执行节点查找
 TOOL_MAP = {t.name: t for t in ALL_TOOLS}
 
-# 内置工具的风险等级。三者都是纯计算/查询，不碰文件也不执行命令，
+# 内置工具的风险等级。四者都是纯计算/查询，不碰文件也不执行命令，
 # 归为只读，不该为它们弹审批。
 # 显式写在这里而不是靠 @tool 的参数：不同 langchain-core 版本的
 # 装饰器签名不一致（有的叫 metadata，有的叫 extras）。
@@ -144,4 +146,5 @@ TOOL_RISKS = {
     "calculator": "read",
     "get_current_time": "read",
     "get_weather": "read",
+    "search_knowledge_base": "read",
 }

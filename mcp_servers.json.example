@@ -1,6 +1,6 @@
 {
-  "_comment": "外部 MCP server 连接配置。MultiServerMCPClient 会按此连接并发现工具。",
-  "_comment2": "transport 支持: stdio（本地子进程）/ http（streamable-http 远程）/ sse（旧版 SSE 远程）",
+  "_comment": "外部 MCP server 连接配置。langchain.mcp 的 MCPAdapter（fastmcp 4.x / MCP 2.x）会按此连接并发现工具。",
+  "_comment2": "transport 支持: stdio（本地子进程）/ http（streamable-http 远程）/ sse（旧版 SSE 远程）。标准 mcpServers 格式下 stdio 看 command、http 看 url，可省略 transport 字段。",
   "_comment3": "enabled=false 的 server 会被跳过，不影响其他 server",
   "_comment4": "把本文件复制为 mcp_servers.json 后修改；mcp_servers.json 已在 .gitignore",
 

@@ -17,6 +17,7 @@ FastAPI 应用，整合：
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -76,8 +77,13 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Agent 工具注册表已刷新（新增 %d 个 MCP 工具）", n)
     # 加载 Skill（把 Skill 的工具注入注册表，提示词注入系统提示）
     if settings.skills_enabled:
-        # 导入 builtin 触发 @skill 注册
-        import app.skills.builtin  # noqa: F401
+        # 导入 builtin 触发 @skill 注册。
+        # ⚠️ 不能写 `import app.skills.builtin`：`import a.b.c` 会把顶层名 `app`
+        # 绑定为本函数的局部变量（= 模块对象），从此函数后半段的 `app` 全都
+        # 不再是 FastAPI 实例——A2A 挂载与静态托管因此静默坏掉（已踩坑）。
+        from importlib import import_module
+
+        import_module("app.skills.builtin")
 
         # Skill 工具走工具注册表注入
         from app.agent import registry as tool_reg
@@ -112,6 +118,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:  # noqa: BLE001
         logger.warning("A2A delegate 工具注册失败（不阻断）：%s", e)
     logger.info("✅ 基础设施就绪")
+    # 前端静态托管（桌面客户端 / 单机部署形态）：dist 存在时挂到根路径。
+    # 放在 lifespan 末尾注册——排在所有 API 路由与 A2A 之后，只有
+    # 没被任何 API 匹配的路径才会落到静态文件（html=True 提供 index.html 回退）。
+    if _web_dist.exists():
+        from fastapi.staticfiles import StaticFiles
+
+        app.mount("/", StaticFiles(directory=_web_dist, html=True), name="web")
+        logger.info("✅ Web 前端已托管：%s", _web_dist)
     yield
     logger.info("👋 %s 关闭中，释放连接", settings.app_name)
     # 按初始化的逆序释放（依赖后者先关）
@@ -176,8 +190,28 @@ app.include_router(rag_router)
 app.include_router(api_router)
 app.include_router(upload_router)
 
+
+class _StripApiPrefix:
+    """把 /api/* 请求改写到 /*（纯 ASGI 中间件，放在路由匹配之前）。
+
+    Web 前端统一调 /api/*：开发态由 vite 代理剥前缀；构建产物（桌面客户端/
+    静态托管）没有代理，靠这里改写。对不以 /api 开头的路径零影响。
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope.get("path", "").startswith("/api/"):
+            scope["path"] = scope["path"][len("/api"):]
+        elif scope["type"] == "http" and scope.get("path") == "/api":
+            scope["path"] = "/"
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(_StripApiPrefix)
+
 # 托管上传文件目录（图片等可访问）
-from pathlib import Path  # noqa: E402
 
 _upload_dir = Path(settings.upload_dir)
 _upload_dir.mkdir(parents=True, exist_ok=True)
@@ -186,15 +220,29 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 app.mount("/uploads", StaticFiles(directory=str(_upload_dir)), name="uploads")
 
 
-@app.get("/", tags=["系统"])
-async def root():
-    """根路径：项目简介。"""
-    return {
-        "name": settings.app_name,
-        "version": "0.1.0",
-        "docs": "/docs",
-        "endpoints": ["/health", "/chat", "/chat/stream"],
-    }
+# 前端构建产物（clients/web/dist）存在时，"/" 由 lifespan 末尾的静态挂载接管
+# （index.html）；没有前端（纯 API 部署）时才保留这个 JSON 版项目简介根路由。
+_web_dist = Path(__file__).resolve().parent.parent / "clients" / "web" / "dist"
+
+# /assets 必须在模块级挂载：A2A 会在 lifespan 里注册 `Mount /{tenant}` 通配挂载，
+# lifespan 末尾才挂的静态路由排在它后面，/assets/*.js 会被 A2A 吞掉返回 404
+# （白屏的根源）。模块级路由先于 lifespan 注册，自然优先匹配。
+if (_web_dist / "assets").exists():
+    from fastapi.staticfiles import StaticFiles as _StaticFiles
+
+    app.mount("/assets", _StaticFiles(directory=_web_dist / "assets"), name="web-assets")
+
+if not _web_dist.exists():
+
+    @app.get("/", tags=["系统"])
+    async def root():
+        """根路径：项目简介。"""
+        return {
+            "name": settings.app_name,
+            "version": "0.1.0",
+            "docs": "/docs",
+            "endpoints": ["/health", "/chat", "/chat/stream"],
+        }
 
 
 if __name__ == "__main__":

@@ -55,11 +55,16 @@ def _build_formatter() -> logging.Formatter:
 
 
 def setup_logging() -> None:
-    """初始化根 logger。应用启动时调用一次。"""
+    """初始化根 logger。应用启动时调用一次。
+
+    统一写 stderr 而非 stdout：服务类进程的惯例（12-factor）；
+    更硬的约束是 MCP stdio server——stdout 被 JSON-RPC 协议独占，
+    任何落进 stdout 的日志行都会让 client 把它当成协议响应而断连。
+    """
     settings = get_settings()
     level = getattr(logging, settings.log_level.upper(), logging.INFO)
 
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(_build_formatter())
     handler.addFilter(TraceIdFilter())
 

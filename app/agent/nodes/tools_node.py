@@ -86,7 +86,7 @@ def _denied_by_policy(name: str) -> str | None:
     return None
 
 
-async def _run_one(call: dict, writer: StreamWriter, limit: int) -> tuple[ToolMessage, dict]:
+async def _run_one(call: dict, writer: StreamWriter, limit: int, config: RunnableConfig) -> tuple[ToolMessage, dict]:
     """执行单个 tool_call，任何异常都转成 ToolMessage 交回模型。"""
     name = call["name"]
     args = call.get("args", {})
@@ -142,8 +142,11 @@ async def _run_one(call: dict, writer: StreamWriter, limit: int) -> tuple[ToolMe
             sp.set_status(StatusCode.ERROR, f"未知工具 {name}")
         else:
             try:
-                # 统一用 ainvoke：BaseTool 内部自动 dispatch 同步/异步
-                output = await tool_fn.ainvoke(args)
+                # 统一用 ainvoke：BaseTool 内部自动 dispatch 同步/异步。
+                # 把图 config 传下去：声明了 RunnableConfig 参数的工具
+                # （如 search_knowledge_base）能拿到 configurable 里的
+                # kb_ids / tenant_id 等请求级上下文；不声明的工具不受影响。
+                output = await tool_fn.ainvoke(args, config=config)
                 logger.info("工具调用 %s%s → %s", name, args, str(output)[:200])
             except Exception as e:  # noqa: BLE001
                 # 工具失败不该中断整个 ReAct 循环——把错误交回模型，它可以换个参数重试。
@@ -187,7 +190,7 @@ async def tools_node(state: AgentState, config: RunnableConfig, writer: StreamWr
         return {"messages": []}
 
     limit = get_settings().tool_result_max_chars
-    results = await asyncio.gather(*(_run_one(c, writer, limit) for c in tool_calls))
+    results = await asyncio.gather(*(_run_one(c, writer, limit, config) for c in tool_calls))
 
     # 顺序必须与 tool_calls 一致：OpenAI/Anthropic 都要求每个 tool_call_id
     # 有且仅有一条对应的结果消息，gather 保序正好满足

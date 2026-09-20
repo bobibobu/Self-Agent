@@ -191,3 +191,37 @@ app/llm/
     ├── openai_like.py   # OpenAI 兼容（含 GLM、OpenAI、DeepSeek 等）
     └── anthropic.py     # Anthropic 原生协议
 ```
+
+## 八、运行时配置热替换（不重启换 key）
+
+「换个 key 不重启」是市面 Agent 平台（Dify 等）的标配能力，本项目通过
+`POST /admin/llm-config`（仅管理员，`require_admin`）实现：
+
+```
+POST /admin/llm-config  {"glm_api_key": "新key"}
+     │
+     ├─ ① 内存配置原地更新（Settings 实例是全局单例，改了即刻被读到）
+     ├─ ② 失效各层 lru_cache 客户端：
+     │      factory.reset_llm_clients()          # chat 客户端
+     │      embeddings.reset_embedding_caches()  # embedding 客户端 + 配置
+     │      rag.reset_rag_utility_llm()          # contextual 分块客户端
+     └─ ③ dotenv.set_key 写回 .env（重启不丢；persist=false 可只改内存）
+```
+
+下次任意 LLM/embedding 调用会按新配置重建客户端——**无需重启**。
+
+### embedding 维度变化的边界
+
+同 provider 同模型换 key：即刻完全生效。但若换 key 顺带让 embedding 的
+provider/模型/**维度**变了（如从未配 key 的 256 维哈希伪向量切到 2048 维
+真实向量），已入库的旧向量会维度失配——响应里返回
+`embedding_reindex_required: true` 并打 WARNING，需要重启重建 store
+并重新 ingest 知识库。这是向量索引的物理约束，不是实现缺陷。
+
+### 版本说明（2026-09）
+
+openai SDK 3.x 与 anthropic SDK 1.x 已跟进。两者的 breaking 点都是默认
+HTTP 客户端换成 httpx2（httpx 不再自动安装）；本项目从不传自定义
+http client，只传 timeout/max_retries，升级零改动。OpenTelemetry 的
+httpx instrumentation 只覆盖 httpx 1.x 的外呼（FastAPI 侧），LLM 的
+GenAI span（`chat {model}` 等）是本项目自己埋的 manual span，不受影响。

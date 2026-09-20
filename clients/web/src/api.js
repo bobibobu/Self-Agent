@@ -178,6 +178,44 @@ export async function cancelChat(threadId) {
   return resp.json()
 }
 
+/**
+ * 审批决策回传：图从 approval_required 中断处续跑（SSE，事件格式同 streamChat）。
+ * decision 支持 true/false、"approve"/"deny"、{"approved": bool, "reason": str}。
+ */
+export async function resumeChat({ thread_id, decision }, onEvent) {
+  const resp = await fetch(`${API_BASE}/chat/resume`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ thread_id, decision }),
+  })
+  if (resp.status === 401) {
+    clearAuth()
+    throw new Error('登录已过期，请重新登录')
+  }
+  if (!resp.ok) {
+    throw new Error(`HTTP ${resp.status}: ${await resp.text()}`)
+  }
+  // SSE 解析与 streamChat 相同
+  const reader = resp.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  const consume = (chunk) => {
+    buffer += decoder.decode(chunk, { stream: true }).replace(/\r\n|\r/g, '\n')
+    const blocks = buffer.split('\n\n')
+    buffer = blocks.pop()
+    for (const block of blocks) {
+      const event = parseSSEBlock(block)
+      if (event) onEvent(event)
+    }
+  }
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    consume(value)
+  }
+  consume(decoder.decode())
+}
+
 // ===== 会话管理 =====
 
 export async function listSessions() {
@@ -249,4 +287,24 @@ export async function health() {
   } catch {
     return { status: 'error' }
   }
+}
+
+// ===== 运行时配置（设置中心）=====
+
+export async function getLlmConfig() {
+  const resp = await fetch(`${API_BASE}/admin/llm-config`, { headers: authHeaders() })
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+  return resp.json()
+}
+
+/** 在线替换 LLM 配置（不重启生效）。fields 只传要改的，key 传空串表示清除。 */
+export async function updateLlmConfig(fields) {
+  const resp = await fetch(`${API_BASE}/admin/llm-config`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(fields),
+  })
+  const data = await resp.json().catch(() => ({}))
+  if (!resp.ok) throw new Error(errorMessage(data, '保存失败'))
+  return data
 }

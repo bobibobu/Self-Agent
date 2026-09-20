@@ -113,22 +113,43 @@ Skill 工具 ┘
 
 ---
 
-## 五、版本策略（重要决策）
+## 五、版本策略（2026-09 已迁移到 MCP 2.x）
 
 本项目 MCP 相关依赖版本：
 
 | 包 | 版本 | 说明 |
 |---|---|---|
-| `mcp` | **1.29.0**（1.x 最新） | 2.0 是 2026-07 大重构版 |
-| `langchain-mcp-adapters` | **0.3.1**（最新） | 官方桥接库 |
+| `mcp` | **2.2.0**（2.x） | 2026-07-28 规范大版本：stateless core、extensions、Tasks（SEP-2663 尚未随 SDK 落地） |
+| `langchain[mcp]` | **1.4.2** | 官方桥接迁入 langchain 主包 `langchain.mcp` 命名空间（`langchain-mcp-adapters` 仓库已于 2026-09-17 归档） |
+| `fastmcp` | **4.0.5** | `langchain[mcp]` extra 的实际底层（独立维护的 FastMCP 框架）；server 侧也用它 |
 
-**为什么 mcp 锁 1.x 而不用 2.0？**
+**迁移了什么：**
 
-`langchain-mcp-adapters 0.3.1`（PyPI 最新 + GitHub main 分支）仍使用 mcp 1.x 的 `RequestContext`，**尚未适配 mcp 2.0**。若强行用 mcp 2.0 会导致导入崩溃。
+- **Client 侧**（`app/mcp/client.py`）：`MultiServerMCPClient(servers).get_tools()`
+  → `MCPAdapter(mcp_config).list_tools()`。配置从 `{"servers": {...}}` 翻译成
+  fastmcp 的标准 `{"mcpServers": {...}}`（stdio 看 command、http 看 url，无需显式 transport）。
+  adapter 在 connect 时进入异步上下文并**保持连接**，disconnect 时退出——
+  工具的 session 跨请求可用。
+- **Server 侧**（`app/mcp/server.py`）：官方 mcp SDK 2.0 移除了内置 FastMCP
+  （`mcp.server.fastmcp` 导入会指向迁移指南），改用独立包 `from fastmcp import FastMCP`
+  （装饰器 API 兼容，`mcp.run(transport="http", host=..., port=...)`）。
+- **顺手修掉一个隐患**：旧实现用 `async def _wrapped(**kwargs)` 注册工具——
+  `**kwargs` 签名推不出参数 schema，注册出去的是**无参工具**。现在从
+  LangChain 工具的 `args_schema` 动态生成带真实类型签名的包装函数
+  （fastmcp 用 `inspect.signature` + `get_type_hints` 推导 schema）。
 
-已在 `pyproject.toml` 中用 `mcp>=1.24.0,<2.0` 约束并注释说明。待官方适配后解除上限即可。
+**stdio 的铁律（本次迁移踩到的真坑）：**
 
-这是工程权衡的典型案例：**追新不能违背兼容性现实**。
+stdout 被 JSON-RPC 协议独占。任何落进 stdout 的日志行都会被 client 当成
+协议响应，直接 `Connection closed`。因此：
+
+- 全局日志根通道走 **stderr**（`app/core/logging.py`，12-factor 惯例）；
+- stdio 模式启动加 `show_banner=False`；
+- 测试 `tests/test_mcp_v2.py::test_cross_process_stdio_roundtrip` 用真实
+  stdio 子进程钉住这条规则。
+
+**注意**：`langchain.mcp` 目前是 beta（API 可能变动），locked 在
+`langchain[mcp]>=1.4.2,<2.0` 上界内随小版本跟进。
 
 ---
 
@@ -137,8 +158,8 @@ Skill 工具 ┘
 **Q: MCP 和 A2A 有什么区别？**
 A: MCP 是 **agent↔tool**（Agent 调用工具），A2A 是 **agent↔agent**（Agent 之间协作）。互补关系，本 Agent 既能用 MCP 调工具，也能（Phase 4）用 A2A 与其他 Agent 通信。
 
-**Q: 为什么用 langchain-mcp-adapters 而不自己写桥接？**
-A: 官方维护、经过测试、返回标准 BaseTool 无缝接入 LangGraph。自己写要处理 MCP 协议细节（会话、JSON-RPC、工具 schema 转换），约 150 行，没必要重复造轮子。
+**Q: 为什么用 langchain.mcp（原 langchain-mcp-adapters）而不自己写桥接？**
+A: 官方维护、经过测试、返回标准 BaseTool 无缝接入 LangGraph。自己写要处理 MCP 协议细节（会话、JSON-RPC、工具 schema 转换），约 150 行，没必要重复造轮子。原独立包已归档并迁入 langchain 主包的 `langchain.mcp` 命名空间（底层 fastmcp 4.x + mcp 2.x），本项目已跟进迁移。
 
 **Q: MCP 工具和内置工具有性能差异吗？**
 A: 有。MCP stdio 传输走子进程管道，有序列化开销；内置工具是同进程函数调用。但对 LLM 对话场景（秒级响应），这点开销可忽略。若工具调用极频繁（如高频交易），应考虑内置或 http 传输。

@@ -105,10 +105,20 @@ def test_health(client):
 
 
 def test_root(client):
-    """根路径返回端点列表。"""
+    """根路径：有前端构建产物时是 SPA 首页，没有时是 JSON 项目简介。"""
+    import json as _json
+    from pathlib import Path
+
+    import app.main as main_mod
+
+    dist = Path(main_mod.__file__).resolve().parent.parent / "clients" / "web" / "dist"
     resp = client.get("/")
     assert resp.status_code == 200
-    assert "/chat" in resp.json()["endpoints"]
+    if dist.exists():
+        # 静态托管形态：/ 由 lifespan 挂载的 StaticFiles 接管
+        assert resp.headers["content-type"].startswith("text/html")
+    else:
+        assert "/chat" in _json.loads(resp.text)["endpoints"]
 
 
 def test_chat_with_tool_call(client):

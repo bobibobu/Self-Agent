@@ -132,3 +132,14 @@ def log_embedding_status() -> None:
         )
     else:
         logger.info("向量检索：%s / %s（%d 维）", provider, model, dims)
+
+
+def reset_embedding_caches() -> None:
+    """清空 embedding 配置与客户端缓存，让下一次调用按**当前**配置重建。
+
+    供运行时配置热替换（/admin/llm-config）调用。
+    ⚠️ 若更换导致 dims 变化（如 256 哈希向量 → 2048 真实向量），已入库的
+    旧向量维度不再匹配，需要重建 store（重启）并重新 ingest 知识库。
+    """
+    embedding_config.cache_clear()
+    _client.cache_clear()

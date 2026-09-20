@@ -11,13 +11,15 @@ API 路由
 from __future__ import annotations
 
 import json
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from app import __version__
-from app.agent.graph import run_agent, stream_agent
+from app.agent.graph import resume_agent, run_agent, stream_agent
 from app.api.schemas import (
     AddInterestRequest,
     AddMemoryRequest,
@@ -25,6 +27,7 @@ from app.api.schemas import (
     ChatRequest,
     ChatResponse,
     HealthResponse,
+    ResumeRequest,
 )
 from app.auth.dependencies import CurrentUser, get_current_user, require_admin
 from app.core.config import get_settings
@@ -41,10 +44,15 @@ router = APIRouter()
 async def health() -> HealthResponse:
     """健康检查。"""
     s = get_settings()
+    from app.workspace import get_workspace
+
     return HealthResponse(
         app=s.app_name,
         version=__version__,
         default_provider=s.llm_default_provider,
+        storage_backend=s.storage_backend,
+        workspace_root=str(get_workspace().root),
+        auth_enabled=s.auth_enabled,
     )
 
 
@@ -119,6 +127,31 @@ async def chat_stream(req: ChatRequest, user: CurrentUser = Depends(get_current_
 
     async def event_generator():
         async for event in stream_agent(req.message, req.thread_id, user_id=uid, kb_ids=req.kb_ids, tenant_id=tenant):
+            etype = event.get("type", "message")
+            yield {
+                "event": etype,
+                "data": json.dumps(event, ensure_ascii=False),
+            }
+
+    return EventSourceResponse(event_generator())
+
+
+@router.post("/chat/resume", tags=["对话"])
+async def chat_resume(req: ResumeRequest, user: CurrentUser = Depends(get_current_user)):
+    """审批决策回传：图从 approval_required 中断处原地续跑（SSE，事件格式同 /chat/stream）。
+
+    没有这个端点，Web/桌面客户端收到 approval_required 后没有任何办法
+    把用户决策送回图里——审批流在远程形态下就是断的。
+    """
+    new_trace_id()
+    uid = user.user_id if user.is_authenticated else None
+    tenant = user.tenant_id
+    logger.info("chat/resume 请求 thread=%s decision=%s", req.thread_id, req.decision)
+
+    async def event_generator():
+        async for event in resume_agent(
+            req.thread_id, req.decision, user_id=uid, tenant_id=tenant,
+        ):
             etype = event.get("type", "message")
             yield {
                 "event": etype,
@@ -453,3 +486,139 @@ async def metrics(_: CurrentUser = Depends(require_admin)):
     from app.services.observability import get_metrics
 
     return get_metrics()
+
+
+# ==================== 运行时配置：LLM key 热替换 ====================
+# 「换个 key 不重启」——市面 Agent 平台（Dify 等）的标配能力。
+# 三件事：改内存配置（立即生效）→ 失效各层 lru_cache 客户端 → 写回 .env（重启不丢）。
+
+
+class LlmConfigUpdate(BaseModel):
+    """只传要改的字段，None = 保持不变。key 传空串表示清除。"""
+
+    glm_api_key: str | None = None
+    openai_api_key: str | None = None
+    anthropic_api_key: str | None = None
+    glm_model: str | None = None
+    openai_model: str | None = None
+    anthropic_model: str | None = None
+    llm_default_provider: Literal["glm", "openai", "anthropic"] | None = None
+    # 是否写回 .env 持久化（默认写；false 则只影响当前进程，重启回退）
+    persist: bool = True
+
+
+class LlmConfigStatus(BaseModel):
+    """当前 LLM 配置（key 打码，只够辨认是哪把钥匙）。"""
+
+    llm_default_provider: str
+    glm_api_key_masked: str
+    openai_api_key_masked: str
+    anthropic_api_key_masked: str
+    glm_model: str
+    openai_model: str
+    anthropic_model: str
+    # 热替换 key 不需要重启；但若换 key 顺带改变了 embedding 的 provider/模型/维度，
+    # 已入库的旧向量维度会失配——此时置 true，提示需要重启重建 store 并重新 ingest
+    embedding_reindex_required: bool = False
+    embedding_provider: str
+    embedding_model: str
+    embedding_dims: int
+
+
+def _mask(key: str) -> str:
+    if not key:
+        return ""
+    if len(key) <= 12:
+        return key[:4] + "****"
+    return f"{key[:8]}...{key[-4:]}"
+
+
+def _apply_llm_config(update: LlmConfigUpdate) -> LlmConfigStatus:
+    """热替换的实现体（独立成函数便于测试，不依赖 HTTP 生命周期）。"""
+    from dotenv import set_key
+
+    s = get_settings()
+    # 必须在改配置**之前**读旧 embedding 三元组：embedding_config 是 lru_cache，
+    # 缓存命中时它代表旧配置；缓存冷时现场计算，此刻配置也还没动，同样是旧值
+    from app.memory.embeddings import embedding_config as _embedding_config
+
+    old_embedding = _embedding_config()
+
+    changed: dict[str, str] = {}
+    for field in (
+        "glm_api_key", "openai_api_key", "anthropic_api_key",
+        "glm_model", "openai_model", "anthropic_model", "llm_default_provider",
+    ):
+        new_value = getattr(update, field)
+        if new_value is not None and new_value != getattr(s, field):
+            setattr(s, field, new_value)
+            changed[field] = str(new_value)
+
+    if changed and update.persist:
+        env_path = s.env_file_path
+        for field, value in changed.items():
+            set_key(env_path, field.upper(), value)
+        logger.info("已将 %d 项 LLM 配置变更持久化到 %s", len(changed), env_path)
+
+    # 失效各层缓存客户端：下一次调用按新配置重建，不重启即生效
+    from app.llm.factory import reset_llm_clients
+    from app.memory.embeddings import reset_embedding_caches
+    from app.rag.service import reset_rag_utility_llm
+
+    reset_llm_clients()
+    reset_embedding_caches()
+    reset_rag_utility_llm()
+
+    # 维度/模型变化意味着已入库向量与新 embedding 不再兼容
+    #（哈希伪向量 → 真实向量、换 embedding 模型、换维度，都算）
+    provider, model, dims = _embedding_config()
+    reindex_required = old_embedding != (provider, model, dims)
+    if reindex_required:
+        logger.warning(
+            "embedding 配置已变化（%s/%s/%d维 → %s/%s/%d维），"
+            "已入库的旧向量维度失配，需重启重建 store 并重新 ingest 知识库",
+            *old_embedding, provider, model, dims,
+        )
+
+    return LlmConfigStatus(
+        llm_default_provider=s.llm_default_provider,
+        glm_api_key_masked=_mask(s.glm_api_key),
+        openai_api_key_masked=_mask(s.openai_api_key),
+        anthropic_api_key_masked=_mask(s.anthropic_api_key),
+        glm_model=s.glm_model,
+        openai_model=s.openai_model,
+        anthropic_model=s.anthropic_model,
+        embedding_reindex_required=reindex_required,
+        embedding_provider=provider or "none(哈希伪向量)",
+        embedding_model=model,
+        embedding_dims=dims,
+    )
+
+
+@router.get("/admin/llm-config", tags=["管理"])
+async def get_llm_config(_: CurrentUser = Depends(require_admin)):
+    """查看当前 LLM 配置（key 打码）。仅管理员。"""
+    s = get_settings()
+    return {
+        "llm_default_provider": s.llm_default_provider,
+        "glm_api_key_masked": _mask(s.glm_api_key),
+        "openai_api_key_masked": _mask(s.openai_api_key),
+        "anthropic_api_key_masked": _mask(s.anthropic_api_key),
+        "glm_model": s.glm_model,
+        "openai_model": s.openai_model,
+        "anthropic_model": s.anthropic_model,
+        "embedding_provider": s.embedding_provider,
+    }
+
+
+@router.post("/admin/llm-config", tags=["管理"])
+async def update_llm_config(update: LlmConfigUpdate, _: CurrentUser = Depends(require_admin)):
+    """在线替换 LLM key / 模型 / 默认 provider——**不重启立即生效**。
+
+    原理：内存配置原地更新 + 失效 lru_cache 客户端 + 写回 env 文件持久化。
+    换 key（同 provider 同模型）即刻完全生效；若顺带改变了 embedding 的
+    provider/模型/维度，响应里 embedding_reindex_required=true，
+    已入库向量需要重建（重启 + 重新 ingest）。仅管理员。
+    """
+    status = _apply_llm_config(update)
+    return {"status": "ok", "config": status.model_dump()}

@@ -185,6 +185,10 @@ async def run_agent(message: str, thread_id: str, user_id: str | None = None, kb
                 # 当前时间走 config 侧通道（不进 SYSTEM_PROMPT），由 agent_node
                 # 临时拼到对话末尾。这是为了让 system prompt 完全静态、命中缓存。
                 "current_time": _current_time_str(),
+                # 请求级上下文：供 search_knowledge_base 等工具读取
+                # （工具自己不收 kb_ids 参数，模型无法越权检索未关联的知识库）
+                "kb_ids": list(kb_ids) if kb_ids else [],
+                "tenant_id": tenant_id,
             },
             "recursion_limit": get_settings().agent_recursion_limit,  # 防止 agent↔tools 死循环
         }
@@ -435,6 +439,11 @@ async def _stream_graph(
             "configurable": {
                 "thread_id": scoped_tid,
                 "tools": get_all_tools(),
+                # 请求级上下文：供 search_knowledge_base 等工具读取。
+                # 续跑时 kb_ids 为 None（图从中断处恢复，上下文已在执行状态里），
+                # 空列表会让工具如实告知模型「没有关联知识库」。
+                "kb_ids": list(kb_ids) if kb_ids else [],
+                "tenant_id": tenant_id,
             },
             "recursion_limit": get_settings().agent_recursion_limit,
         }
