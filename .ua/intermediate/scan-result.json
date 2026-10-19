@@ -1,6 +1,6 @@
 {
   "name": "self-agent",
-  "description": "Enterprise-grade AI Agent built on LangGraph, MCP, A2A, and a unified multi-protocol LLM abstraction (GLM/OpenAI/Anthropic); ships both as a coding-agent CLI and a deployable multi-user service. Note: this project has over 100 source files; consider scoping analysis to a subdirectory for faster results.",
+  "description": "基于 LangGraph + MCP + A2A 与多协议 LLM 抽象层（GLM/OpenAI/Anthropic）构建的企业级 AI Agent，既可作为在项目目录中干活的编码 Agent CLI，也可部署为多用户 Agent 服务。",
   "languages": [
     "config",
     "css",
@@ -10,9 +10,10 @@
     "json",
     "markdown",
     "python",
+    "pyw",
     "sql",
     "toml",
-    "unknown",
+    "vbs",
     "yaml"
   ],
   "frameworks": [
@@ -28,26 +29,20 @@
     {
       "path": ".env.example",
       "language": "config",
-      "sizeLines": 154,
+      "sizeLines": 167,
       "fileCategory": "config"
-    },
-    {
-      "path": ".ua/.understandignore",
-      "language": "unknown",
-      "sizeLines": 111,
-      "fileCategory": "code"
-    },
-    {
-      "path": ".zcode/plans/plan-sess_5f557916-caa3-4e7b-8161-77e53cfd63f0.md",
-      "language": "markdown",
-      "sizeLines": 99,
-      "fileCategory": "docs"
     },
     {
       "path": "README.md",
       "language": "markdown",
-      "sizeLines": 260,
+      "sizeLines": 287,
       "fileCategory": "docs"
+    },
+    {
+      "path": "Self-Agent 桌面版.vbs",
+      "language": "vbs",
+      "sizeLines": 16,
+      "fileCategory": "code"
     },
     {
       "path": "app/__init__.py",
@@ -100,13 +95,13 @@
     {
       "path": "app/agent/context_manager.py",
       "language": "python",
-      "sizeLines": 111,
+      "sizeLines": 183,
       "fileCategory": "code"
     },
     {
       "path": "app/agent/graph.py",
       "language": "python",
-      "sizeLines": 555,
+      "sizeLines": 591,
       "fileCategory": "code"
     },
     {
@@ -118,19 +113,19 @@
     {
       "path": "app/agent/nodes/agent_node.py",
       "language": "python",
-      "sizeLines": 130,
+      "sizeLines": 145,
       "fileCategory": "code"
     },
     {
       "path": "app/agent/nodes/bridge.py",
       "language": "python",
-      "sizeLines": 74,
+      "sizeLines": 109,
       "fileCategory": "code"
     },
     {
       "path": "app/agent/nodes/tools_node.py",
       "language": "python",
-      "sizeLines": 211,
+      "sizeLines": 214,
       "fileCategory": "code"
     },
     {
@@ -142,7 +137,7 @@
     {
       "path": "app/agent/prompts/__init__.py",
       "language": "python",
-      "sizeLines": 25,
+      "sizeLines": 33,
       "fileCategory": "code"
     },
     {
@@ -160,7 +155,7 @@
     {
       "path": "app/agent/tools/__init__.py",
       "language": "python",
-      "sizeLines": 147,
+      "sizeLines": 150,
       "fileCategory": "code"
     },
     {
@@ -170,9 +165,15 @@
       "fileCategory": "code"
     },
     {
+      "path": "app/agent/tools/kb.py",
+      "language": "python",
+      "sizeLines": 103,
+      "fileCategory": "code"
+    },
+    {
       "path": "app/agent/tools/shell.py",
       "language": "python",
-      "sizeLines": 157,
+      "sizeLines": 196,
       "fileCategory": "code"
     },
     {
@@ -184,13 +185,13 @@
     {
       "path": "app/api/routes.py",
       "language": "python",
-      "sizeLines": 455,
+      "sizeLines": 624,
       "fileCategory": "code"
     },
     {
       "path": "app/api/schemas.py",
       "language": "python",
-      "sizeLines": 68,
+      "sizeLines": 83,
       "fileCategory": "code"
     },
     {
@@ -232,7 +233,7 @@
     {
       "path": "app/auth/user_service.py",
       "language": "python",
-      "sizeLines": 109,
+      "sizeLines": 131,
       "fileCategory": "code"
     },
     {
@@ -244,7 +245,13 @@
     {
       "path": "app/core/config.py",
       "language": "python",
-      "sizeLines": 241,
+      "sizeLines": 258,
+      "fileCategory": "code"
+    },
+    {
+      "path": "app/core/eventloop.py",
+      "language": "python",
+      "sizeLines": 68,
       "fileCategory": "code"
     },
     {
@@ -256,13 +263,13 @@
     {
       "path": "app/core/logging.py",
       "language": "python",
-      "sizeLines": 85,
+      "sizeLines": 90,
       "fileCategory": "code"
     },
     {
       "path": "app/core/telemetry.py",
       "language": "python",
-      "sizeLines": 274,
+      "sizeLines": 281,
       "fileCategory": "code"
     },
     {
@@ -274,7 +281,7 @@
     {
       "path": "app/db/manager.py",
       "language": "python",
-      "sizeLines": 176,
+      "sizeLines": 179,
       "fileCategory": "code"
     },
     {
@@ -292,7 +299,7 @@
     {
       "path": "app/evolution/prompt_store.py",
       "language": "python",
-      "sizeLines": 118,
+      "sizeLines": 133,
       "fileCategory": "code"
     },
     {
@@ -316,13 +323,13 @@
     {
       "path": "app/llm/factory.py",
       "language": "python",
-      "sizeLines": 75,
+      "sizeLines": 84,
       "fileCategory": "code"
     },
     {
       "path": "app/llm/models.py",
       "language": "python",
-      "sizeLines": 102,
+      "sizeLines": 109,
       "fileCategory": "code"
     },
     {
@@ -334,13 +341,13 @@
     {
       "path": "app/llm/providers/anthropic.py",
       "language": "python",
-      "sizeLines": 199,
+      "sizeLines": 218,
       "fileCategory": "code"
     },
     {
       "path": "app/llm/providers/openai_like.py",
       "language": "python",
-      "sizeLines": 260,
+      "sizeLines": 267,
       "fileCategory": "code"
     },
     {
@@ -352,7 +359,7 @@
     {
       "path": "app/main.py",
       "language": "python",
-      "sizeLines": 208,
+      "sizeLines": 261,
       "fileCategory": "code"
     },
     {
@@ -364,13 +371,13 @@
     {
       "path": "app/mcp/client.py",
       "language": "python",
-      "sizeLines": 115,
+      "sizeLines": 162,
       "fileCategory": "code"
     },
     {
       "path": "app/mcp/server.py",
       "language": "python",
-      "sizeLines": 94,
+      "sizeLines": 131,
       "fileCategory": "code"
     },
     {
@@ -388,7 +395,7 @@
     {
       "path": "app/memory/embeddings.py",
       "language": "python",
-      "sizeLines": 134,
+      "sizeLines": 145,
       "fileCategory": "code"
     },
     {
@@ -400,7 +407,7 @@
     {
       "path": "app/memory/pg.py",
       "language": "python",
-      "sizeLines": 88,
+      "sizeLines": 89,
       "fileCategory": "code"
     },
     {
@@ -448,7 +455,7 @@
     {
       "path": "app/rag/service.py",
       "language": "python",
-      "sizeLines": 185,
+      "sizeLines": 499,
       "fileCategory": "code"
     },
     {
@@ -472,7 +479,7 @@
     {
       "path": "app/services/session_service.py",
       "language": "python",
-      "sizeLines": 211,
+      "sizeLines": 224,
       "fileCategory": "code"
     },
     {
@@ -566,6 +573,30 @@
       "fileCategory": "code"
     },
     {
+      "path": "clients/desktop/README.md",
+      "language": "markdown",
+      "sizeLines": 45,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "clients/desktop/app.py",
+      "language": "python",
+      "sizeLines": 297,
+      "fileCategory": "code"
+    },
+    {
+      "path": "clients/desktop/app.pyw",
+      "language": "pyw",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "clients/desktop/window.py",
+      "language": "python",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
       "path": "clients/web/README.md",
       "language": "markdown",
       "sizeLines": 56,
@@ -580,19 +611,19 @@
     {
       "path": "clients/web/package.json",
       "language": "json",
-      "sizeLines": 21,
+      "sizeLines": 24,
       "fileCategory": "config"
     },
     {
       "path": "clients/web/src/App.css",
       "language": "css",
-      "sizeLines": 168,
+      "sizeLines": 727,
       "fileCategory": "markup"
     },
     {
       "path": "clients/web/src/App.jsx",
       "language": "javascript",
-      "sizeLines": 270,
+      "sizeLines": 654,
       "fileCategory": "code"
     },
     {
@@ -604,7 +635,7 @@
     {
       "path": "clients/web/src/api.js",
       "language": "javascript",
-      "sizeLines": 252,
+      "sizeLines": 310,
       "fileCategory": "code"
     },
     {
@@ -626,123 +657,15 @@
       "fileCategory": "code"
     },
     {
-      "path": "docs/00-overview/02-从零读懂.md",
-      "language": "markdown",
-      "sizeLines": 549,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/00-overview/README.md",
-      "language": "markdown",
-      "sizeLines": 426,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/01-architecture/README.md",
-      "language": "markdown",
-      "sizeLines": 254,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/02-modules/01-llm-layer.md",
-      "language": "markdown",
-      "sizeLines": 189,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/02-modules/02-agent-graph.md",
-      "language": "markdown",
-      "sizeLines": 116,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/02-modules/03-memory.md",
-      "language": "markdown",
-      "sizeLines": 123,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/02-modules/04-mcp.md",
-      "language": "markdown",
-      "sizeLines": 144,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/02-modules/05-skills.md",
-      "language": "markdown",
-      "sizeLines": 145,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/02-modules/06-user-profile.md",
-      "language": "markdown",
-      "sizeLines": 115,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/02-modules/07-a2a.md",
-      "language": "markdown",
-      "sizeLines": 146,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/02-modules/08-hermes-evolution.md",
-      "language": "markdown",
-      "sizeLines": 113,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/02-modules/09-auth-tenant.md",
-      "language": "markdown",
-      "sizeLines": 99,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/02-modules/10-rag-enterprise.md",
-      "language": "markdown",
-      "sizeLines": 117,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/02-modules/README.md",
-      "language": "markdown",
-      "sizeLines": 23,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/03-development/01-setup.md",
-      "language": "markdown",
-      "sizeLines": 160,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/03-development/README.md",
-      "language": "markdown",
-      "sizeLines": 40,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/04-guides/README.md",
-      "language": "markdown",
-      "sizeLines": 43,
-      "fileCategory": "docs"
-    },
-    {
-      "path": "docs/05-interview/README.md",
-      "language": "markdown",
-      "sizeLines": 240,
-      "fileCategory": "docs"
-    },
-    {
       "path": "infra/README.md",
       "language": "markdown",
-      "sizeLines": 150,
+      "sizeLines": 178,
       "fileCategory": "docs"
     },
     {
       "path": "infra/docker-compose.yml",
       "language": "yaml",
-      "sizeLines": 144,
+      "sizeLines": 159,
       "fileCategory": "infra"
     },
     {
@@ -772,19 +695,31 @@
     {
       "path": "pyproject.toml",
       "language": "toml",
-      "sizeLines": 130,
+      "sizeLines": 148,
       "fileCategory": "config"
+    },
+    {
+      "path": "renovate.json",
+      "language": "json",
+      "sizeLines": 54,
+      "fileCategory": "config"
+    },
+    {
+      "path": "scripts/benchmark.py",
+      "language": "python",
+      "sizeLines": 175,
+      "fileCategory": "code"
     },
     {
       "path": "scripts/cleanup_test_data.py",
       "language": "python",
-      "sizeLines": 106,
+      "sizeLines": 110,
       "fileCategory": "code"
     },
     {
       "path": "scripts/verify_agent.py",
       "language": "python",
-      "sizeLines": 123,
+      "sizeLines": 125,
       "fileCategory": "code"
     },
     {
@@ -796,13 +731,13 @@
     {
       "path": "scripts/verify_hermes.py",
       "language": "python",
-      "sizeLines": 143,
+      "sizeLines": 171,
       "fileCategory": "code"
     },
     {
       "path": "scripts/verify_phase2.py",
       "language": "python",
-      "sizeLines": 145,
+      "sizeLines": 153,
       "fileCategory": "code"
     },
     {
@@ -832,7 +767,7 @@
     {
       "path": "scripts/verify_stream.py",
       "language": "python",
-      "sizeLines": 130,
+      "sizeLines": 153,
       "fileCategory": "code"
     },
     {
@@ -844,19 +779,31 @@
     {
       "path": "tests/test_api_smoke.py",
       "language": "python",
-      "sizeLines": 169,
+      "sizeLines": 184,
       "fileCategory": "code"
     },
     {
       "path": "tests/test_client_contract.py",
       "language": "python",
-      "sizeLines": 291,
+      "sizeLines": 295,
       "fileCategory": "code"
     },
     {
       "path": "tests/test_coding_tools.py",
       "language": "python",
-      "sizeLines": 283,
+      "sizeLines": 317,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_desktop_support.py",
+      "language": "python",
+      "sizeLines": 46,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_eventloop.py",
+      "language": "python",
+      "sizeLines": 71,
       "fileCategory": "code"
     },
     {
@@ -866,9 +813,39 @@
       "fileCategory": "code"
     },
     {
+      "path": "tests/test_mcp_v2.py",
+      "language": "python",
+      "sizeLines": 154,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_perf_optimizations.py",
+      "language": "python",
+      "sizeLines": 218,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_pg_services.py",
+      "language": "python",
+      "sizeLines": 238,
+      "fileCategory": "code"
+    },
+    {
       "path": "tests/test_plan.py",
       "language": "python",
       "sizeLines": 216,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_prompt_caching.py",
+      "language": "python",
+      "sizeLines": 126,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_rag_hybrid.py",
+      "language": "python",
+      "sizeLines": 220,
       "fileCategory": "code"
     },
     {
@@ -878,15 +855,27 @@
       "fileCategory": "code"
     },
     {
+      "path": "tests/test_runtime_config.py",
+      "language": "python",
+      "sizeLines": 141,
+      "fileCategory": "code"
+    },
+    {
       "path": "tests/test_sandbox.py",
       "language": "python",
-      "sizeLines": 231,
+      "sizeLines": 232,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_structured_output.py",
+      "language": "python",
+      "sizeLines": 121,
       "fileCategory": "code"
     },
     {
       "path": "tests/test_telemetry.py",
       "language": "python",
-      "sizeLines": 283,
+      "sizeLines": 349,
       "fileCategory": "code"
     },
     {
@@ -896,14 +885,13 @@
       "fileCategory": "code"
     }
   ],
-  "totalFiles": 145,
-  "filteredByIgnore": 0,
+  "totalFiles": 143,
+  "filteredByIgnore": 169,
   "estimatedComplexity": "moderate",
   "importMap": {
     ".env.example": [],
-    ".ua/.understandignore": [],
-    ".zcode/plans/plan-sess_5f557916-caa3-4e7b-8161-77e53cfd63f0.md": [],
     "README.md": [],
+    "Self-Agent 桌面版.vbs": [],
     "app/__init__.py": [],
     "app/a2a/__init__.py": [],
     "app/a2a/client.py": [
@@ -968,12 +956,16 @@
     ],
     "app/agent/state.py": [],
     "app/agent/tools/__init__.py": [
+      "app/agent/tools/kb.py",
       "app/core/logging.py"
     ],
     "app/agent/tools/files.py": [
       "app/core/config.py",
       "app/core/logging.py",
       "app/workspace.py"
+    ],
+    "app/agent/tools/kb.py": [
+      "app/core/logging.py"
     ],
     "app/agent/tools/shell.py": [
       "app/core/config.py",
@@ -1024,6 +1016,9 @@
     ],
     "app/core/__init__.py": [],
     "app/core/config.py": [],
+    "app/core/eventloop.py": [
+      "app/core/logging.py"
+    ],
     "app/core/exceptions.py": [],
     "app/core/logging.py": [
       "app/core/config.py",
@@ -1194,6 +1189,10 @@
       "clients/cli/selfagent_cli/config.py"
     ],
     "clients/cli/selfagent_cli/render.py": [],
+    "clients/desktop/README.md": [],
+    "clients/desktop/app.py": [],
+    "clients/desktop/app.pyw": [],
+    "clients/desktop/window.py": [],
     "clients/web/README.md": [],
     "clients/web/index.html": [],
     "clients/web/package.json": [],
@@ -1213,24 +1212,6 @@
       "clients/web/src/index.css"
     ],
     "clients/web/vite.config.js": [],
-    "docs/00-overview/02-从零读懂.md": [],
-    "docs/00-overview/README.md": [],
-    "docs/01-architecture/README.md": [],
-    "docs/02-modules/01-llm-layer.md": [],
-    "docs/02-modules/02-agent-graph.md": [],
-    "docs/02-modules/03-memory.md": [],
-    "docs/02-modules/04-mcp.md": [],
-    "docs/02-modules/05-skills.md": [],
-    "docs/02-modules/06-user-profile.md": [],
-    "docs/02-modules/07-a2a.md": [],
-    "docs/02-modules/08-hermes-evolution.md": [],
-    "docs/02-modules/09-auth-tenant.md": [],
-    "docs/02-modules/10-rag-enterprise.md": [],
-    "docs/02-modules/README.md": [],
-    "docs/03-development/01-setup.md": [],
-    "docs/03-development/README.md": [],
-    "docs/04-guides/README.md": [],
-    "docs/05-interview/README.md": [],
     "infra/README.md": [],
     "infra/docker-compose.yml": [],
     "infra/mongo/init.js": [],
@@ -1238,6 +1219,10 @@
     "infra/postgres/migrations/001_fix_conversations_schema.sql": [],
     "mcp_servers.json.example": [],
     "pyproject.toml": [],
+    "renovate.json": [],
+    "scripts/benchmark.py": [
+      "app/llm/models.py"
+    ],
     "scripts/cleanup_test_data.py": [],
     "scripts/verify_agent.py": [
       "app/llm/base.py",
@@ -1261,10 +1246,29 @@
     "tests/test_api_smoke.py": [],
     "tests/test_client_contract.py": [],
     "tests/test_coding_tools.py": [],
+    "tests/test_desktop_support.py": [],
+    "tests/test_eventloop.py": [],
     "tests/test_local_mode.py": [],
+    "tests/test_mcp_v2.py": [],
+    "tests/test_perf_optimizations.py": [],
+    "tests/test_pg_services.py": [
+      "app/db/manager.py"
+    ],
     "tests/test_plan.py": [],
+    "tests/test_prompt_caching.py": [
+      "app/agent/prompts/__init__.py"
+    ],
+    "tests/test_rag_hybrid.py": [],
     "tests/test_regressions.py": [],
+    "tests/test_runtime_config.py": [
+      "app/auth/dependencies.py",
+      "app/core/config.py"
+    ],
     "tests/test_sandbox.py": [],
+    "tests/test_structured_output.py": [
+      "app/agent/nodes/bridge.py",
+      "app/llm/models.py"
+    ],
     "tests/test_telemetry.py": [],
     "tests/test_unit.py": []
   }

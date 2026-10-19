@@ -109,3 +109,13 @@
 # Swift
 # **/Tests/**/*.swift
 # **/Specs/**/*.swift
+
+# --- Active exclusions (2026-10-19) ---
+# 图谱自身产物与 agent 会话计划：分析它们只会让图谱自我引用
+.ua/
+.zcode/
+# 疑似凭据文件：内容绝不能进入知识图谱
+Token.txt
+wind-token.txt
+# 本次只分析代码和配置（docs/ 下的模块文档与书稿不入图谱）
+docs/
