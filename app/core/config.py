@@ -94,7 +94,8 @@ class Settings(BaseSettings):
     postgres_user: str = "selfagent"
     postgres_password: str = "selfagent123"
     postgres_db: str = "selfagent"
-    # LangGraph checkpointer/store 共享连接池的上限
+    # 共享 psycopg 连接池的上限：业务表（users/conversations）+ LangGraph checkpointer/store
+    # 全走这一个池（2026-10 起不再另开 asyncpg 池）
     postgres_pool_max_size: int = 10
 
     # ---------- MongoDB ----------
@@ -223,20 +224,18 @@ class Settings(BaseSettings):
 
     @property
     def postgres_dsn(self) -> str:
-        """异步 Postgres 连接串（asyncpg 格式，纯 postgresql://）。"""
+        """Postgres 连接串（libpq URI 格式，纯 postgresql://）。"""
         return (
             f"postgresql://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
 
     @property
-    def postgres_dsn_asyncpg(self) -> str:
-        """asyncpg 专用：与 postgres_dsn 相同（纯 postgresql://）。"""
-        return self.postgres_dsn
-
-    @property
     def postgres_dsn_sync(self) -> str:
-        """同步 Postgres 连接串（LangGraph PostgresSaver 用 psycopg 格式）。"""
+        """psycopg 共享连接池用的连接串（业务表 + LangGraph checkpointer/store）。
+
+        名字里的 sync 是历史遗留：psycopg 的同步/异步连接接受同一种 libpq 串。
+        """
         return self.postgres_dsn
 
     @property

@@ -1,8 +1,9 @@
 """
-LangGraph 持久化层共享的 Postgres 连接池
-========================================
-checkpointer（短期记忆）与 store（长期记忆 / RAG）都基于 psycopg，
-共用一个连接池，避免各开一条连接、也避免 from_conn_string 的单连接瓶颈。
+全应用共享的 Postgres 连接池（psycopg）
+=====================================
+checkpointer（短期记忆）、store（长期记忆 / RAG）、业务表（users /
+conversations，经 db_manager.postgres 访问）都走这一个池。
+以前业务表另用一个 asyncpg 池，进程里两套驱动、两倍连接，2026-10 合并。
 
 为什么不用 `AsyncPostgresSaver.from_conn_string(...)`：
     它是 `@asynccontextmanager`，返回的是上下文管理器而不是 saver 实例。
@@ -67,11 +68,11 @@ async def get_pg_pool(*, timeout: float = 5.0):
             # wait=True：等池子真的建起至少一条连接，连不上就在这里抛，快速失败
             await pool.open(wait=True, timeout=timeout)
             _pool = pool
-            logger.info("LangGraph Postgres 连接池已就绪（max_size=%d）", s.postgres_pool_max_size)
+            logger.info("共享 Postgres 连接池已就绪（业务表 + LangGraph，max_size=%d）", s.postgres_pool_max_size)
             return _pool
         except Exception as e:  # noqa: BLE001
             _pool_failed = True
-            logger.warning("LangGraph Postgres 连接池不可用，持久化将降级为内存：%s", e)
+            logger.warning("共享 Postgres 连接池不可用：LangGraph 持久化降级为内存，用户/会话表不可用：%s", e)
             return None
 
 
@@ -81,7 +82,7 @@ async def close_pg_pool() -> None:
     if _pool is not None:
         try:
             await _pool.close()  # type: ignore[attr-defined]
-            logger.info("LangGraph Postgres 连接池已关闭")
+            logger.info("共享 Postgres 连接池已关闭")
         except Exception as e:  # noqa: BLE001
             logger.warning("关闭 Postgres 连接池失败：%s", e)
     _pool = None

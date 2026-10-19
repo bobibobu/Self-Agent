@@ -123,7 +123,8 @@ cd clients/web && npm install && npm run dev   # http://localhost:5173
 
 > **升级已有环境**：`init.sql` 只在数据卷首次创建时执行。老环境需手动跑
 > `infra/postgres/migrations/001_fix_conversations_schema.sql`，
-> 并把 Postgres 镜像换成 `pgvector/pgvector:pg16`（语义索引需要 vector 扩展）。
+> 并把 Postgres 镜像换成 `pgvector/pgvector:0.8.7-pg16`（语义索引需要 vector 扩展）。
+> 各数据库镜像跨版本升级的注意事项见 [infra/README.md](../../infra/README.md) 的「版本与升级」一节。
 
 ---
 
@@ -277,7 +278,7 @@ Self-Agent/
 │   ├── memory/
 │   │   ├── checkpointer.py       # 短期记忆（SQLite / Postgres / 内存）
 │   │   ├── local_store.py        # ★ 本地 SQLite 存储，按项目分库
-│   │   ├── pg.py                 # LangGraph 共享 Postgres 连接池
+│   │   ├── pg.py                 # 全应用共享 psycopg 连接池（业务表 + LangGraph）
 │   │   ├── store.py              # 长期记忆
 │   │   └── embeddings.py         # 向量化（真实 embedding + 降级）
 │   ├── rag/                      # 知识库：分块 · 检索 · 路由

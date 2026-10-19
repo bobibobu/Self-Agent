@@ -1,0 +1,54 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "依赖自动跟进：Python(uv.lock) / Web(npm) / infra 镜像。原则与 pyproject.toml 顶部注释一致——上界内的更新只刷锁文件，跨上界的才改 pyproject；大版本一律人工确认。说明见 docs/04-guides/依赖升级记录.md",
+  "extends": ["config:recommended"],
+  "timezone": "Asia/Shanghai",
+  "schedule": ["before 9am on monday"],
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 5,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 9am on monday"]
+  },
+  "registryAliases": {
+    "docker.m.daocloud.io": "docker.io",
+    "docker.1panel.live": "docker.io"
+  },
+  "packageRules": [
+    {
+      "description": "Python：范围内更新只刷 uv.lock，越过上界才改 pyproject（保留手写的上界）",
+      "matchManagers": ["pep621"],
+      "rangeStrategy": "update-lockfile"
+    },
+    {
+      "matchManagers": ["pep621"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "python minor/patch"
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "web minor/patch"
+    },
+    {
+      "description": "OTel 的 api/sdk/exporter 与 instrumentation 版本号联动，必须同批升级",
+      "matchPackageNames": ["/^opentelemetry-/"],
+      "groupName": "opentelemetry"
+    },
+    {
+      "matchPackageNames": ["/^langgraph/", "/^langchain/"],
+      "groupName": "langgraph & langchain"
+    },
+    {
+      "description": "大版本（含数据库镜像跨大版本，需迁移数据卷）在 Dependency Dashboard 里勾选后才开 PR",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Neo4j 留在 5.x LTS，不跟日历版本号（2026.xx 每月一版、只支持到下一版）",
+      "matchManagers": ["docker-compose"],
+      "matchPackageNames": ["/neo4j/"],
+      "allowedVersions": "/^5\\./"
+    }
+  ]
+}

@@ -28,6 +28,7 @@ import contextlib
 import os
 import shlex
 import signal
+import subprocess
 
 from langchain_core.tools import tool
 
@@ -122,6 +123,11 @@ async def run_command(command: str, cwd: str = ".") -> str:
             start_new_session=True,
             preexec_fn=sbx.preexec,  # noqa: PLW1509 —— Landlock 必须在 fork 后 exec 前施加
         )
+    except NotImplementedError:
+        # Windows 的 SelectorEventLoop 不支持 asyncio 子进程。服务端在 Windows 上为了
+        # 兼容 psycopg 必须用 Selector（见 app/core/eventloop.py），这里退到线程里同步跑。
+        logger.info("run_command: 当前事件循环不支持 asyncio 子进程，改用线程执行 subprocess.run")
+        return await _run_in_thread(command, argv[0], sbx, str(workdir), child_env, s.shell_timeout_seconds)
     except FileNotFoundError:
         return f"错误：找不到命令 {argv[0]!r}"
     except OSError as e:
@@ -131,17 +137,50 @@ async def run_command(command: str, cwd: str = ".") -> str:
         stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=s.shell_timeout_seconds)
     except TimeoutError:
         _kill_process_group(proc)
+        logger.warning("run_command 超时已终止：%s（>%.0fs）", command, s.shell_timeout_seconds)
         return f"错误：命令超时（超过 {s.shell_timeout_seconds:.0f} 秒），已终止"
 
+    return _format_result(command, proc.returncode, stdout, backend.value)
+
+
+async def _run_in_thread(command: str, program: str, sbx, cwd: str, env: dict | None, timeout: float) -> str:
+    """同步 subprocess.run 放进线程执行（事件循环不支持 asyncio 子进程时的兜底）。
+
+    超时时 subprocess.run 会 kill 子进程本身；Windows 没有进程组可杀，孤儿子进程无法一并清理。
+    """
+    try:
+        r = await asyncio.to_thread(
+            subprocess.run,
+            sbx.argv,
+            cwd=cwd,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=timeout,
+            start_new_session=True,
+            preexec_fn=sbx.preexec,  # noqa: PLW1509
+        )
+    except subprocess.TimeoutExpired:
+        logger.warning("run_command 超时已终止（线程模式）：%s（>%.0fs）", command, timeout)
+        return f"错误：命令超时（超过 {timeout:.0f} 秒），已终止"
+    except FileNotFoundError:
+        return f"错误：找不到命令 {program!r}"
+    except OSError as e:
+        return f"错误：启动失败：{e}"
+    return _format_result(command, r.returncode, r.stdout, sbx.backend.value)
+
+
+def _format_result(command: str, returncode: int | None, stdout: bytes | None, backend: str) -> str:
     output = (stdout or b"").decode("utf-8", errors="replace")
     if len(output) > _MAX_OUTPUT_CHARS:
         omitted = len(output) - _MAX_OUTPUT_CHARS
         output = output[:_MAX_OUTPUT_CHARS] + f"\n...[输出过长，已截断 {omitted} 字符]"
 
-    status = "成功" if proc.returncode == 0 else f"失败（退出码 {proc.returncode}）"
+    status = "成功" if returncode == 0 else f"失败（退出码 {returncode}）"
+    logger.info("run_command 完成：%s → %s，输出 %d 字符", command, status, len(output))
     # 把生效的沙箱后端写进输出：用户和模型都该知道这条命令跑在哪一层保护下，
     # 「以为有沙箱其实没有」比「明确知道没有」危险得多
-    tag = f" sandbox={backend.value}" if backend.value != "none" else " sandbox=none ⚠️"
+    tag = f" sandbox={backend}" if backend != "none" else " sandbox=none ⚠️"
     return f"$ {command}\n[{status}{tag}]\n{output or '(无输出)'}"
 
 

@@ -281,3 +281,69 @@ class TestTelemetryToggles:
 
         with span("some.work", **{"selfagent.thread_id": "x"}) as sp:
             assert sp is not None  # no-op span 也是合法对象
+
+
+# ==================== 出站 HTTP 埋点 ====================
+
+
+class TestOutboundHttpInstrumentation:
+    """回归：openai 3 / anthropic 1 / mcp 2 的默认 HTTP 客户端换成了 httpx2，
+    而埋点只挂了 httpx——LLM 请求的 HTTP span（状态码、429 重试）静默消失，
+    只剩手写的 `chat {model}` span。两套 HTTP 栈都必须挂。
+    """
+
+    def test_setup_instruments_both_http_stacks(self):
+        import inspect
+
+        from app.core import telemetry
+
+        src = inspect.getsource(telemetry.setup_telemetry)
+        assert "HTTPXClientInstrumentor" in src and "HTTPX2ClientInstrumentor" in src
+
+    @pytest.mark.asyncio
+    async def test_llm_sdk_request_produces_http_span(self):
+        """用真实 openai SDK 打本地假服务，断言 httpx2 埋点产出了 CLIENT span。"""
+        import json
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        import httpx2
+        import openai
+        from opentelemetry.instrumentation.httpx import HTTPX2ClientInstrumentor
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+        from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+        from opentelemetry.trace import SpanKind
+
+        class _Models(BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = json.dumps({"object": "list", "data": []}).encode()
+                self.send_response(200)
+                self.send_header("content-type", "application/json")
+                self.send_header("content-length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        server = HTTPServer(("127.0.0.1", 0), _Models)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        instrumentor = HTTPX2ClientInstrumentor()
+        instrumentor.instrument(tracer_provider=provider)
+        try:
+            client = openai.AsyncOpenAI(
+                api_key="test", base_url=f"http://127.0.0.1:{server.server_port}/v1", max_retries=0,
+            )
+            assert isinstance(client._client, httpx2.AsyncClient), "openai SDK 已不再基于 httpx2，重新评估埋点"
+            await client.models.list()
+        finally:
+            instrumentor.uninstrument()
+            server.shutdown()
+
+        http_spans = [s for s in exporter.get_finished_spans() if s.kind == SpanKind.CLIENT]
+        assert http_spans, "LLM SDK 的出站请求没有产生 HTTP span"
+        assert any(str(s.attributes.get("http.url", "")).endswith("/v1/models") for s in http_spans)

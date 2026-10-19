@@ -12,7 +12,7 @@
 ```bash
 cd infra
 
-docker compose up -d       # 启动全部 4 个服务
+docker compose up -d       # 启动全部 5 个服务（4 个数据库 + Jaeger）
 docker compose ps          # 查看运行状态
 docker compose logs -f     # 实时日志（全部）
 docker compose logs -f postgres   # 单看某个服务
@@ -25,12 +25,16 @@ docker compose down -v     # 停止并删除数据（重新开始）
 
 ## 📦 组件清单
 
-| 服务 | 端口 | 用途 | 数据目录 |
-|---|---|---|---|
-| **PostgreSQL 16** | 5432 | 主库：对话状态、长期记忆、用户数据 | `data/postgres/` |
-| **MongoDB 7** | 27017 | 文档库：事件日志、非结构化数据 | `data/mongo/` |
-| **Redis 7** | 6379 | 缓存：LLM 响应缓存、限流、临时态 | `data/redis/` |
-| **Neo4j 5** | 7474 / 7687 | 图库：用户画像、知识图谱 | `data/neo4j/` |
+| 服务 | 镜像（2026-10） | 端口 | 用途 | 数据目录 | 支持截止 |
+|---|---|---|---|---|---|
+| **PostgreSQL 16** + pgvector 0.8.7 | `pgvector/pgvector:0.8.7-pg16` | 5432 | 主库：对话状态、长期记忆、用户数据 | `data/postgres/` | 2028-11 |
+| **MongoDB 8.0** | `mongo:8.0` | 27017 | 文档库：事件日志、非结构化数据 | `data/mongo/` | 2029-10 |
+| **Redis 8.2** | `redis:8.2-alpine` | 6379 | 缓存：LLM 响应缓存、限流、临时态 | `data/redis/` | 2030-09 |
+| **Neo4j 5.26 LTS** | `neo4j:5.26-community` | 7474 / 7687 | 图库：用户画像、知识图谱 | `data/neo4j/` | 2028-06 |
+| **Jaeger v2** | `jaegertracing/jaeger:2.22.0` | 16686 / 4317 / 4318 | 链路追踪：OTLP 接收 + Web UI | 无（内存存储） | — |
+
+> 镜像经国内镜像站（`docker.m.daocloud.io` / `docker.1panel.live`）拉取，标签钉到小版本，补丁自动跟进。
+> 跨版本升级由 Renovate 开 PR（根目录 `renovate.json`），**已有数据卷**跨大版本前先看下面的「版本与升级」。
 
 ---
 
@@ -108,6 +112,30 @@ URI:      bolt://localhost:7687
 ```
 
 打开 http://localhost:7474 可用 Neo4j Browser 交互式查询（Cypher 语句）。
+
+### 5. Jaeger —— "span 往哪发、在哪看？"
+
+**一句话**：OTLP 链路追踪后端。`.env` 设 `OTEL_ENABLED=true` 后，应用把 span 发到 `http://localhost:4318`，
+在 http://localhost:16686 按 trace_id 看一轮对话的完整调用树（LLM 请求、工具执行、RAG 检索各自耗时）。
+
+- 用的是 **Jaeger v2**（基于 OpenTelemetry Collector）。v1 的 `jaegertracing/all-in-one` 已停更（最后一版 1.76.0）。
+- 不带 `--config` 启动即 all-in-one 模式：内存存储、OTLP 默认开启，重启丢数据，开发够用。
+- 健康检查走 `http://localhost:13133/status`（healthcheckv2 扩展）。
+
+---
+
+## ⬆️ 版本与升级
+
+compose 里每个镜像旁都有注释写明「为什么是这个版本、跨版本要注意什么」。已有数据卷时：
+
+| 组件 | 升级前要做的事 |
+|---|---|
+| PostgreSQL | pgvector 换版本后执行一次 `ALTER EXTENSION vector UPDATE;`。**大版本**（16→17/18）数据目录不兼容，要 `pg_dump` 导出再导入或 `pg_upgrade`；PG18 官方镜像还把数据目录挪到了 `/var/lib/postgresql/18/docker`，挂载点要跟着改 |
+| MongoDB | 7.0 → 8.0 可直接换镜像，前提是 `featureCompatibilityVersion` 为 `"7.0"`；稳定后执行 `db.adminCommand({setFeatureCompatibilityVersion: "8.0", confirm: true})`。**不能 7.0 直跳 9.0** |
+| Redis | 7.x 的 RDB/AOF 文件 8.x 直接可读 |
+| Neo4j | 留在 5.26 LTS；之后的日历版本（2026.xx）每月一版、只支持到下一版发布 |
+
+完整的升级记录（每次升了什么、为什么、踩了什么坑）见 [依赖升级记录](../docs/04-guides/依赖升级记录.md)。
 
 ---
 

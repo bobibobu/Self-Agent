@@ -21,31 +21,37 @@ logger = get_logger(__name__)
 
 
 class SessionService:
-    """会话管理（按租户+用户隔离）。"""
+    """会话管理（按租户+用户隔离）。
+
+    走 db_manager.postgres（psycopg 共享连接池，autocommit + dict_row）：
+    占位符是 %s，受影响行数看 cursor.rowcount。
+    """
+
+    _COLS = "id, thread_id, title, user_id, tenant_id, created_at, updated_at"
 
     async def list_sessions(
         self, user_id: str | None = None, *, tenant_id: str = "default", limit: int = 50,
     ) -> list[dict[str, Any]]:
         """列出会话（按 tenant_id 必过滤，可按 user_id 过滤），按更新时间倒序。"""
+        logger.info("[sessions] list 入参 user=%s tenant=%s limit=%d", user_id, tenant_id, limit)
         try:
             pool = db_manager.postgres
             if pool is None:
+                logger.warning("[sessions] list 跳过：PostgreSQL 不可用，返回空列表")
                 return []
-            async with pool.acquire() as conn:
-                if user_id:
-                    rows = await conn.fetch(
-                        "SELECT id, thread_id, title, user_id, tenant_id, created_at, updated_at "
-                        "FROM conversations WHERE tenant_id = $1 AND user_id = $2 "
-                        "ORDER BY updated_at DESC LIMIT $3",
-                        tenant_id, user_id, limit,
-                    )
-                else:
-                    rows = await conn.fetch(
-                        "SELECT id, thread_id, title, user_id, tenant_id, created_at, updated_at "
-                        "FROM conversations WHERE tenant_id = $1 ORDER BY updated_at DESC LIMIT $2",
-                        tenant_id, limit,
-                    )
-            return [self._row_to_dict(r) for r in rows]
+            if user_id:
+                sql = (f"SELECT {self._COLS} FROM conversations WHERE tenant_id = %s AND user_id = %s "
+                       "ORDER BY updated_at DESC LIMIT %s")
+                params: tuple[Any, ...] = (tenant_id, user_id, limit)
+            else:
+                sql = f"SELECT {self._COLS} FROM conversations WHERE tenant_id = %s ORDER BY updated_at DESC LIMIT %s"
+                params = (tenant_id, limit)
+            async with pool.connection() as conn:
+                cur = await conn.execute(sql, params)
+                rows = await cur.fetchall()
+            result = [self._row_to_dict(r) for r in rows]
+            logger.info("[sessions] list 返回 %d 条 thread=%s", len(result), [r.get("thread_id") for r in result])
+            return result
         except Exception as e:  # noqa: BLE001
             logger.warning("列出会话失败：%s", e)
             return []
@@ -55,39 +61,48 @@ class SessionService:
     ) -> dict[str, Any]:
         """新建会话，返回含 thread_id 的会话信息（带 tenant_id）。"""
         thread_id = f"sess-{uuid.uuid4().hex[:12]}"
+        logger.info("[sessions] create 入参 user=%s tenant=%s title=%s → thread=%s", user_id, tenant_id, title, thread_id)
+        fallback = {"thread_id": thread_id, "title": title, "user_id": user_id, "tenant_id": tenant_id, "source": "memory"}
         try:
             pool = db_manager.postgres
             if pool is None:
-                return {"thread_id": thread_id, "title": title, "user_id": user_id, "tenant_id": tenant_id, "source": "memory"}
-            async with pool.acquire() as conn:
-                row = await conn.fetchrow(
-                    "INSERT INTO conversations (thread_id, user_id, title, tenant_id) VALUES ($1, $2, $3, $4) "
-                    "RETURNING id, thread_id, title, user_id, tenant_id, created_at, updated_at",
-                    thread_id, user_id, title, tenant_id,
+                logger.warning("[sessions] create 降级：PostgreSQL 不可用，返回内存会话 %s", fallback)
+                return fallback
+            async with pool.connection() as conn:
+                cur = await conn.execute(
+                    "INSERT INTO conversations (thread_id, user_id, title, tenant_id) VALUES (%s, %s, %s, %s) "
+                    f"RETURNING {self._COLS}",
+                    (thread_id, user_id, title, tenant_id),
                 )
-            logger.info("新建会话 thread=%s user=%s tenant=%s", thread_id, user_id, tenant_id)
-            return self._row_to_dict(row)
+                row = await cur.fetchone()
+            result = self._row_to_dict(row)
+            logger.info("新建会话 thread=%s user=%s tenant=%s 返回=%s", thread_id, user_id, tenant_id, result)
+            return result
         except Exception as e:  # noqa: BLE001
             logger.warning("创建会话记录失败（仍返回可用 thread_id）：%s", e)
-            return {"thread_id": thread_id, "title": title, "user_id": user_id, "tenant_id": tenant_id, "source": "memory"}
+            return fallback
 
     async def rename_session(
         self, thread_id: str, title: str, *, tenant_id: str = "default", user_id: str | None = None,
     ) -> bool:
         """重命名会话（按租户 + 归属人校验）。"""
+        logger.info("[sessions] rename 入参 thread=%s title=%s tenant=%s user=%s", thread_id, title, tenant_id, user_id)
         try:
             pool = db_manager.postgres
             if pool is None:
+                logger.warning("[sessions] rename 跳过：PostgreSQL 不可用")
                 return False
-            sql = ("UPDATE conversations SET title = $1, updated_at = now() "
-                   "WHERE thread_id = $2 AND tenant_id = $3")
-            args: list[Any] = [title, thread_id, tenant_id]
+            sql = ("UPDATE conversations SET title = %s, updated_at = now() "
+                   "WHERE thread_id = %s AND tenant_id = %s")
+            params: list[Any] = [title, thread_id, tenant_id]
             if user_id is not None:
-                sql += " AND user_id = $4"
-                args.append(user_id)
-            async with pool.acquire() as conn:
-                result = await conn.execute(sql, *args)
-            return self._affected(result) > 0
+                sql += " AND user_id = %s"
+                params.append(user_id)
+            async with pool.connection() as conn:
+                cur = await conn.execute(sql, params)
+                affected = cur.rowcount
+            logger.info("[sessions] rename 返回 affected=%d thread=%s", affected, thread_id)
+            return affected > 0
         except Exception as e:  # noqa: BLE001
             logger.warning("重命名会话失败：%s", e)
             return False
@@ -98,24 +113,27 @@ class SessionService:
         """删除会话（按租户 + 归属人校验，含清理 checkpointer 状态）。"""
         from app.auth.tenant import scoped_thread_id
 
+        logger.info("[sessions] delete 入参 thread=%s tenant=%s user=%s", thread_id, tenant_id, user_id)
         try:
             pool = db_manager.postgres
             if pool is None:
+                logger.warning("[sessions] delete 跳过：PostgreSQL 不可用")
                 return False
             scoped_tid = scoped_thread_id(tenant_id, thread_id)
-            sql = "DELETE FROM conversations WHERE thread_id = $1 AND tenant_id = $2"
-            args: list[Any] = [thread_id, tenant_id]
+            sql = "DELETE FROM conversations WHERE thread_id = %s AND tenant_id = %s"
+            params: list[Any] = [thread_id, tenant_id]
             if user_id is not None:
-                sql += " AND user_id = $3"
-                args.append(user_id)
-            async with pool.acquire() as conn:
-                result = await conn.execute(sql, *args)
-            deleted = self._affected(result) > 0
+                sql += " AND user_id = %s"
+                params.append(user_id)
+            async with pool.connection() as conn:
+                cur = await conn.execute(sql, params)
+                deleted = cur.rowcount > 0
             # 只有确实删掉了会话记录，才清理对应的对话状态——
             # 否则越权删除请求会连带把别人的历史清空
             if deleted:
                 await self._purge_thread_state(scoped_tid)
                 logger.info("删除会话 thread=%s tenant=%s", thread_id, tenant_id)
+            logger.info("[sessions] delete 返回 deleted=%s thread=%s", deleted, thread_id)
             return deleted
         except Exception as e:  # noqa: BLE001
             logger.warning("删除会话失败：%s", e)
@@ -135,6 +153,7 @@ class SessionService:
             deleter = getattr(cp, "adelete_thread", None)
             if deleter is not None:
                 await deleter(scoped_thread_id)
+                logger.info("[sessions] 已清理 checkpointer 状态 thread=%s", scoped_thread_id)
         except Exception as e:  # noqa: BLE001
             logger.warning("清理会话状态失败 thread=%s：%s", scoped_thread_id, e)
 
@@ -142,52 +161,46 @@ class SessionService:
         self, thread_id: str, *, tenant_id: str = "default", user_id: str | None = None,
     ) -> dict[str, Any] | None:
         """获取单个会话信息（按租户 + 归属人校验）。"""
+        logger.info("[sessions] get 入参 thread=%s tenant=%s user=%s", thread_id, tenant_id, user_id)
         try:
-            sql = ("SELECT id, thread_id, title, user_id, tenant_id, created_at, updated_at "
-                   "FROM conversations WHERE thread_id = $1 AND tenant_id = $2")
-            args: list[Any] = [thread_id, tenant_id]
+            pool = db_manager.postgres
+            if pool is None:
+                raise RuntimeError("PostgreSQL 不可用")
+            sql = f"SELECT {self._COLS} FROM conversations WHERE thread_id = %s AND tenant_id = %s"
+            params: list[Any] = [thread_id, tenant_id]
             if user_id is not None:
-                sql += " AND user_id = $3"
-                args.append(user_id)
-            rows = await self._exec(sql, *args)
-            return self._row_to_dict(rows[0]) if rows else None
+                sql += " AND user_id = %s"
+                params.append(user_id)
+            async with pool.connection() as conn:
+                cur = await conn.execute(sql, params)
+                row = await cur.fetchone()
+            result = self._row_to_dict(row) if row else None
+            logger.info("[sessions] get 返回=%s", result)
+            return result
         except Exception as e:  # noqa: BLE001
             logger.warning("获取会话失败：%s", e)
             return None
 
-    @staticmethod
-    def _affected(status: str) -> int:
-        """从 asyncpg 的命令状态串（如 "DELETE 1"）解析受影响行数。"""
-        try:
-            return int(status.split()[-1])
-        except (ValueError, IndexError, AttributeError):
-            return 0
-
     async def touch_session(self, thread_id: str, user_id: str | None = None, tenant_id: str = "default") -> None:
         """更新会话的 updated_at（按租户 upsert）。"""
+        logger.info("[sessions] touch 入参 thread=%s user=%s tenant=%s", thread_id, user_id, tenant_id)
         try:
             pool = db_manager.postgres
             if pool is None:
+                logger.info("[sessions] touch 跳过：PostgreSQL 不可用")
                 return
-            async with pool.acquire() as conn:
+            async with pool.connection() as conn:
                 # 冲突键是 (tenant_id, thread_id)——thread_id 单列唯一会让两个租户
                 # 用同一 thread_id 时互相覆盖（见 migrations/001）
-                await conn.execute(
+                cur = await conn.execute(
                     "INSERT INTO conversations (thread_id, user_id, title, tenant_id) "
-                    "VALUES ($1, $2, '对话', $3) "
+                    "VALUES (%s, %s, '对话', %s) "
                     "ON CONFLICT (tenant_id, thread_id) DO UPDATE SET updated_at = now()",
-                    thread_id, user_id, tenant_id,
+                    (thread_id, user_id, tenant_id),
                 )
+            logger.info("[sessions] touch 完成 thread=%s affected=%d", thread_id, cur.rowcount)
         except Exception as e:  # noqa: BLE001
-            logger.debug("touch_session 失败（不影响对话）：%s", e)
-
-    async def _exec(self, sql: str, *args) -> Any:
-        """执行 SQL（需 Postgres 可用）。"""
-        pool = db_manager.postgres
-        if pool is None:
-            raise RuntimeError("PostgreSQL 不可用")
-        async with pool.acquire() as conn:
-            return await conn.fetch(sql, *args) if sql.strip().upper().startswith("SELECT") else await conn.execute(sql, *args)
+            logger.warning("touch_session 失败（不影响对话）：%s", e)
 
     @staticmethod
     def _row_to_dict(row) -> dict[str, Any]:

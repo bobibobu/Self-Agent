@@ -196,6 +196,40 @@ class TestShellTool:
         out = await run_command.ainvoke({"command": "pwd", "cwd": "../.."})
         assert "错误" in out and "工作区外" in out
 
+    @pytest.mark.asyncio
+    async def test_falls_back_when_loop_lacks_subprocess(self, ws, monkeypatch):
+        """回归：Windows 服务端为兼容 psycopg 用 SelectorEventLoop，它不支持 asyncio 子进程
+        （create_subprocess_exec 抛 NotImplementedError）。shell 工具必须退到线程执行，
+        而不是让编码 Agent 在 Windows 上整个跑不了命令。"""
+        import asyncio
+
+        from app.agent.tools.shell import run_command
+
+        async def _unsupported(*args, **kwargs):
+            raise NotImplementedError
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", _unsupported)
+        out = await run_command.ainvoke({"command": "echo via-thread"})
+        assert "via-thread" in out and "成功" in out
+
+        out = await run_command.ainvoke({"command": "definitely-not-a-real-binary-xyz"})
+        assert "找不到命令" in out
+
+    @pytest.mark.asyncio
+    async def test_thread_fallback_enforces_timeout(self, ws, monkeypatch):
+        import asyncio
+
+        import app.core.config as cfg
+        from app.agent.tools.shell import run_command
+
+        async def _unsupported(*args, **kwargs):
+            raise NotImplementedError
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", _unsupported)
+        monkeypatch.setattr(cfg.get_settings(), "shell_timeout_seconds", 0.5)
+        out = await run_command.ainvoke({"command": "sleep 5"})
+        assert "超时" in out
+
 
 # ==================== 审批闸门 ====================
 

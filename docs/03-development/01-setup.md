@@ -12,12 +12,13 @@
 | Docker | ≥ 24.0 | `docker --version` |
 | Docker Compose | ≥ v2 | `docker compose version` |
 | uv（推荐） | 任意 | `uv --version` |
+| Node.js（只在改 Web 前端时需要） | ≥ 20.19 或 ≥ 22.12（Vite 8 要求） | `node --version` |
 
 > Windows 用户建议用 Git Bash 或 WSL。Docker 需先启动 Docker Desktop。
 
 ---
 
-## 第一步：启动基础设施（4 个数据库）
+## 第一步：启动基础设施（4 个数据库 + Jaeger）
 
 ```bash
 cd infra
@@ -27,7 +28,7 @@ docker compose up -d
 验证全部健康：
 ```bash
 docker compose ps
-# 期望看到 4 个服务都是 healthy（neo4j 启动较慢，约 30 秒）
+# 期望看到 5 个服务都是 healthy（neo4j 启动较慢，约 30 秒）
 ```
 
 各服务控制台地址：
@@ -100,6 +101,10 @@ Uvicorn running on http://127.0.0.1:8000
 ```
 
 > 即便某些数据库没连上，服务也能启动（优雅降级），只是对应功能不可用。
+
+> **Windows 不带 `--reload` 启动时**加 `--loop app.core.eventloop:pg_loop_factory`：
+> uvicorn 在 Windows 上默认 ProactorEventLoop，psycopg 异步不支持它，用户/会话表与对话历史
+> 持久化会一起失效（启动日志会打 ERROR 并给出这条改法）。`--reload` 模式和桌面客户端不受影响。
 
 ---
 

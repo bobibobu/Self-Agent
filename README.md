@@ -29,9 +29,10 @@
 | LLM | GLM / OpenAI / Anthropic（统一抽象） |
 | RAG | Hybrid 检索（pgvector + 关键词，RRF 融合）· Contextual 分块 · Agentic 检索工具 |
 | Web | FastAPI + Uvicorn + SSE 流式 |
-| 数据库 | PostgreSQL · MongoDB · Redis · Neo4j |
+| 前端 | React 19 + Vite 8（Web）· pywebview（桌面） |
+| 数据库 | PostgreSQL 16 + pgvector（psycopg 3 单一连接池）· MongoDB 8.0 · Redis 8.2 · Neo4j 5.26 LTS |
 | 协议 | MCP 2.x（langchain.mcp + fastmcp 4）· A2A |
-| 可观测 | OpenTelemetry（GenAI 语义约定）· Jaeger |
+| 可观测 | OpenTelemetry（GenAI 语义约定，httpx + httpx2 出站埋点）· Jaeger v2 |
 | 编码能力 | 工作区禁闭 · 文件读写 · Shell 执行 · 审批闸门 · 沙箱隔离 · 任务计划 |
 | 包管理 | uv |
 
@@ -77,6 +78,10 @@ uv run uvicorn app.main:app --reload
 ```
 
 打开 http://localhost:8000/docs 查看交互式 API 文档。
+
+> **Windows 不带 `--reload` 启动时**要加 `--loop app.core.eventloop:pg_loop_factory`。
+> uvicorn 在 Windows 上默认用 ProactorEventLoop，psycopg 异步不支持它，
+> 登录、会话列表、对话历史持久化会一起失效（启动日志有 ERROR 提示）。桌面客户端已内置该设置。
 
 ### 5. 发起对话
 
@@ -249,7 +254,7 @@ docker exec -i selfagent-postgres \
   psql -U selfagent -d selfagent < infra/postgres/migrations/001_fix_conversations_schema.sql
 ```
 
-另外 `docker-compose.yml` 的 Postgres 镜像已换成 `pgvector/pgvector:pg16`
+另外 `docker-compose.yml` 的 Postgres 镜像已换成 `pgvector/pgvector:0.8.7-pg16`
 （LangGraph 的语义索引需要 `vector` 扩展）。换镜像后需要重建容器：
 
 ```bash
@@ -274,7 +279,8 @@ cd infra && docker compose up -d --force-recreate postgres
 | 长任务 | 已有计划/TODO 层，但仍是单层 ReAct，无子 Agent / 并行分解 |
 | 流式契约 | `stream_agent` 的事件流**必须消费完**，中途 break 会丢掉审批中断状态（有回归测试钉住） |
 | 多模态 | 图片能上传，但 LLM 层 `ChatMessage.content` 只支持纯文本，图片进不了对话 |
-| 部署 | 无应用自身的 Dockerfile，无 CI |
+| Windows | 服务端必须跑 SelectorEventLoop（psycopg 要求，见上文启动说明）；它不支持 asyncio 子进程，shell 工具退到线程里执行，超时只能杀直接子进程，杀不掉它派生出的孙进程 |
+| 部署 | 无应用自身的 Dockerfile，无 CI；Renovate 会按周开依赖 PR，但没有 CI 自动跑测试，合并前要本地 `uv run pytest` |
 
 ## 📄 License
 

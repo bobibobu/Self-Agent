@@ -42,6 +42,11 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     """应用生命周期：启动时连接数据库与 MCP，关闭时断开。"""
     logger.info("🚀 %s 启动中 (env=%s, provider=%s)", settings.app_name, settings.app_env, settings.llm_default_provider)
+    # Windows 的 ProactorEventLoop 跑不了 psycopg：先把原因和改法打出来，
+    # 否则后面只会看到一串「连接池不可用」的降级告警（见 app/core/eventloop.py）
+    from app.core.eventloop import check_loop_compatibility
+
+    check_loop_compatibility()
     # 生产环境安全检查：必须开认证、必须改默认 JWT 密钥
     if settings.app_env == "prod":
         if not settings.auth_enabled:

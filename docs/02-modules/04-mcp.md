@@ -36,30 +36,31 @@ Self-Agent 同时是工具的**使用者**和**提供者**：
 ### Client：连接外部工具
 
 ```python
-# app/mcp/client.py 核心
-from langchain_mcp_adapters.client import MultiServerMCPClient
+# app/mcp/client.py 核心（langchain.mcp，底层 fastmcp 4.x + mcp 2.x）
+from langchain.mcp import MCPAdapter
 
-client = MultiServerMCPClient({
-    "filesystem": {"transport": "stdio", "command": "npx", "args": ["..."]},
-    "search": {"transport": "http", "url": "http://..."},
-})
-tools = await client.get_tools()  # → list[BaseTool]，无缝接入 Agent
+adapter = MCPAdapter({"mcpServers": {
+    "filesystem": {"command": "npx", "args": ["..."]},   # 有 command → stdio
+    "search": {"url": "http://..."},                      # http(s) URL → streamable-http
+}})
+await adapter.__aenter__()            # 进入上下文并保持连接，session 跨请求可用
+tools = await adapter.list_tools()    # → list[BaseTool]，无缝接入 Agent
 ```
 
-`get_tools()` 返回的是标准 LangChain `BaseTool`，**直接塞进我们的工具注册表**，Agent 的 tools_node 零改动就能用。
+`list_tools()` 返回的是标准 LangChain `BaseTool`，**直接塞进我们的工具注册表**，Agent 的 tools_node 零改动就能用。
+`mcp_servers.json` 里的 `{"servers": {...}}` 由 `MCPClientManager._to_mcp_config()` 翻译成上面的标准格式。
 
 ### Server：暴露自身工具
 
 ```python
-# app/mcp/server.py 核心
-from mcp.server.fastmcp import FastMCP
+# app/mcp/server.py 核心（独立包 fastmcp；mcp 2.0 已移除内置的 mcp.server.fastmcp）
+from fastmcp import FastMCP
 
 mcp = FastMCP("self-agent-tools")
 
-@mcp.tool()
-def calculator(expression: str) -> str:
-    """数学计算。"""
-    ...
+for tool in ALL_TOOLS:                       # 内置 LangChain 工具逐一暴露
+    wrapper = _build_typed_wrapper(tool)     # 按 args_schema 生成带类型签名的包装
+    mcp.tool(name=tool.name, description=tool.description)(wrapper)
 ```
 
 启动方式：
@@ -119,9 +120,11 @@ Skill 工具 ┘
 
 | 包 | 版本 | 说明 |
 |---|---|---|
-| `mcp` | **2.2.0**（2.x） | 2026-07-28 规范大版本：stateless core、extensions、Tasks（SEP-2663 尚未随 SDK 落地） |
-| `langchain[mcp]` | **1.4.2** | 官方桥接迁入 langchain 主包 `langchain.mcp` 命名空间（`langchain-mcp-adapters` 仓库已于 2026-09-17 归档） |
-| `fastmcp` | **4.0.5** | `langchain[mcp]` extra 的实际底层（独立维护的 FastMCP 框架）；server 侧也用它 |
+| `mcp` | **2.3.0**（2.x） | 2026-07-28 规范大版本：stateless core、extensions、Tasks（SEP-2663 尚未随 SDK 落地） |
+| `langchain[mcp]` | **1.4.6** | 官方桥接迁入 langchain 主包 `langchain.mcp` 命名空间（`langchain-mcp-adapters` 仓库已于 2026-09-17 归档） |
+| `fastmcp` | **4.1.1** | `langchain[mcp]` extra 的实际底层（独立维护的 FastMCP 框架）；server 侧也用它 |
+
+> 版本号为 2026-10-19 `uv lock --upgrade` 后的锁定值，后续由 Renovate 跟进，以 `uv.lock` 为准。
 
 **迁移了什么：**
 

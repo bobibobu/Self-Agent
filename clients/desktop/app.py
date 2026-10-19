@@ -97,9 +97,16 @@ def start_backend(port: int) -> None:
     """在本进程的守护线程里跑 uvicorn（应用内嵌，不是子进程）。"""
     import uvicorn
 
+    from app.core.eventloop import PG_LOOP_FACTORY
+    from app.core.logging import get_logger
     from app.main import app  # 必须在环境变量设置完之后 import（Settings 会缓存）
 
-    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
+    logger = get_logger("selfagent.desktop")
+
+    # 不指定 loop 时 uvicorn 在 Windows 上选 ProactorEventLoop，psycopg 异步不支持它，
+    # 登录、会话列表、对话历史持久化会全部失效。改用 Selector（见 app/core/eventloop.py）。
+    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", loop=PG_LOOP_FACTORY)
+    logger.info("内嵌后端启动：127.0.0.1:%d（loop=%s）", port, PG_LOOP_FACTORY)
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()

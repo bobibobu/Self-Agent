@@ -27,7 +27,7 @@
 **答**（以下有实测数据支撑，完整报告见 [性能基准报告](../04-guides/性能基准报告.md)，2026-08 实测）：
 0. **先分层定位瓶颈**：mock LLM 零延迟压测框架层——单 worker 新会话 ~680 rps、长会话 ~475 rps、流式 ~400-500 rps；接真实 GLM 后并发 10 只有 **2.5 rps**（e2e p50 ≈ 2.6s）。**框架开销占不到 1%，真实瓶颈在 LLM provider**——此时扩应用实例无收益，先解决 provider 侧。
 1. **LLM 调用是最大瓶颈**（秒级延迟）。横向扩展应用层无状态实例 + 对 LLM 做**请求队列与并发控制**（避免触发 provider 限流）、必要时上多 key 池。本项目用 Redis 做缓存（相同问题命中）和限流计数。
-2. **Postgres 连接池**：`asyncpg` 池大小可调，配合 PgBouncer 做连接复用。
+2. **Postgres 连接池**：业务表与 LangGraph checkpointer/store 共用一个 psycopg 3 `AsyncConnectionPool`（`POSTGRES_POOL_MAX_SIZE` 可调，已设 `prepare_threshold=0` 可直接挂 PgBouncer 事务池）。2026-10 之前业务表另开一个 asyncpg 池，一个进程两套驱动、两倍连接数，已合并。
 3. **短期记忆**：高并发下 Postgres checkpointer 会成热点，可换 ShardedPostgresSaver 按 thread_id 分片。
 4. **无状态化**：把会话状态全放外部存储（已做到——checkpointer 在 DB），应用实例可随意水平扩缩。
 
@@ -52,7 +52,7 @@
 
 ### Q5: 为什么全程用 async？同步 LLM 调用会怎样？
 
-**答**：用 `AsyncOpenAI` / `AsyncAnthropic` / asyncpg / motor，避免阻塞事件循环。若在 async 节点里用同步 `openai.OpenAI`，会**阻塞整个事件循环**——所有并发请求被串行化，吞吐量大幅下降（实测 3x 以上差异）。LangGraph 的 async 图（`astream`/`ainvoke`）配合 async client，能让节点内的 IO 真正并发。
+**答**：用 `AsyncOpenAI` / `AsyncAnthropic` / psycopg 3 异步池 / PyMongo 原生 async（`AsyncMongoClient`，替代已 EOL 的 motor）/ redis.asyncio，避免阻塞事件循环。若在 async 节点里用同步 `openai.OpenAI`，会**阻塞整个事件循环**——所有并发请求被串行化，吞吐量大幅下降（实测 3x 以上差异）。LangGraph 的 async 图（`astream`/`ainvoke`）配合 async client，能让节点内的 IO 真正并发。
 
 ### Q6: 多个工具调用怎么并发执行？
 
@@ -138,9 +138,13 @@ Redis 单线程模型保证原子性，适合分布式限流。
 3. **数据泄露**：委托时可能泄露敏感信息 → 脱敏后再委托
 4. **成本**：无限委托循环 → recursion_limit 限制
 
-### Q16: 为什么 mcp 约束 <2.0 不用 2.0？
+### Q16: mcp 2.0 出来时为什么先锁 <2.0，后来又是怎么迁的？
 
-**答**：`langchain-mcp-adapters`（官方桥接库，当前 0.3.1）至今用 mcp 1.x 的 `RequestContext`，**未适配 mcp 2.0**（2026-07 大重构）。强行用 2.0 会导入崩溃。所以约束是 `mcp>=1.24.0,<2.0`（下限保证 API 稳定，上限挡住 2.0 破坏性变更；当前装的是 1.29.0）。这是工程现实：追新不能违背兼容性。待官方适配后解除。
+**答**：分两步。
+1. **2026-07 先锁**：mcp 2.0 随 2026-07-28 规范大版本发布，但官方桥接 `langchain-mcp-adapters 0.3.1` 仍用 mcp 1.x 的 `RequestContext`，强行上 2.0 会导入崩溃。所以写成 `mcp>=1.24.0,<2.0`，上限挡住破坏性变更，注释写明「在等桥接适配」。
+2. **2026-09 迁移**：adapters 仓库归档（2026-09-17），桥接并入 langchain 主包 `langchain.mcp`（`langchain[mcp]` extra，底层 fastmcp 4.x + mcp 2.x）。生态就绪后解锁：client 从 `MultiServerMCPClient` 换成 `MCPAdapter`，server 从 `mcp.server.fastmcp` 换成独立的 `fastmcp` 包，约束改为 `mcp>=2.0.0,<3.0`。迁移时还顺手修掉了 server 侧「`**kwargs` 包装导致注册出无参工具」的隐患。
+
+**追问点**：锁版本要有出口——上界 + 注释写清「为什么锁、等什么解锁」，条件满足就迁。锁是为了不被 resolver 推着跨 breaking 版本，不是为了永远不升级。
 
 ---
 

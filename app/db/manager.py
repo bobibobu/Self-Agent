@@ -21,8 +21,8 @@ logger = get_logger(__name__)
 
 # 仅类型检查时导入，运行时按需导入避免强依赖
 if TYPE_CHECKING:
-    import asyncpg
     from neo4j import AsyncDriver
+    from psycopg_pool import AsyncConnectionPool
     from pymongo import AsyncMongoClient
     from pymongo.database import Database as MongoDatabase
     from redis import asyncio as aioredis
@@ -34,7 +34,7 @@ class DBManager:
     def __init__(self) -> None:
         self.settings = get_settings()
         # 各客户端懒加载
-        self._postgres: asyncpg.Pool | None = None
+        self._postgres: AsyncConnectionPool | None = None
         self._mongo_client: AsyncMongoClient | None = None
         self._mongo_db: MongoDatabase | None = None
         self._redis: aioredis.Redis | None = None
@@ -62,9 +62,13 @@ class DBManager:
                 logger.warning("%s 关闭失败（不影响其他）：%s", name, e)
 
     async def _close_postgres(self) -> None:
+        # 池的生命周期归 app.memory.pg 管；close_pg_pool 幂等，
+        # main.py 里先关过一次的话这里是空操作
         if self._postgres:
-            await self._postgres.close()
+            from app.memory.pg import close_pg_pool
+
             self._postgres = None
+            await close_pg_pool()
             logger.info("PostgreSQL 连接已关闭")
 
     async def _close_mongo(self) -> None:
@@ -95,23 +99,22 @@ class DBManager:
 
     # ---------- PostgreSQL ----------
     async def _connect_postgres(self) -> None:
-        import asyncpg
+        # 业务表（users / conversations）与 LangGraph checkpointer/store 共用
+        # app/memory/pg.py 的 psycopg 连接池：一个驱动、一个池、一份 DSN。
+        # 以前这里另开了一个 asyncpg 池，进程里同时挂两套 Postgres 驱动、两倍连接数。
+        # 池子在 open(wait=True) 时已经验证过连通性，拿到非 None 就是可用的。
+        from app.memory.pg import get_pg_pool
 
-        pool = await asyncpg.create_pool(
-            dsn=self.settings.postgres_dsn_asyncpg,
-            min_size=2,
-            max_size=10,
-            timeout=5,            # 建连超时（秒），开发期 DB 没起时快速失败
-            command_timeout=10,
-        )
-        # 先验证连通性，通过后才赋值，避免留下不可用的池
-        async with pool.acquire() as conn:
-            await conn.execute("SELECT 1")
+        logger.info("PostgreSQL 连接中: %s:%s", self.settings.postgres_host, self.settings.postgres_port)
+        pool = await get_pg_pool()
+        if pool is None:
+            raise RuntimeError("共享 Postgres 连接池不可用（原因见 app.memory.pg 的告警）")
         self._postgres = pool
-        logger.info("PostgreSQL 已连接: %s:%s", self.settings.postgres_host, self.settings.postgres_port)
+        logger.info("PostgreSQL 已连接（与 LangGraph 共用 psycopg 连接池）: %s:%s",
+                    self.settings.postgres_host, self.settings.postgres_port)
 
     @property
-    def postgres(self) -> asyncpg.Pool | None:
+    def postgres(self) -> AsyncConnectionPool | None:
         return self._postgres
 
     # ---------- MongoDB ----------

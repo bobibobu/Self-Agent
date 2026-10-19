@@ -218,10 +218,17 @@ provider/模型/**维度**变了（如从未配 key 的 256 维哈希伪向量�
 `embedding_reindex_required: true` 并打 WARNING，需要重启重建 store
 并重新 ingest 知识库。这是向量索引的物理约束，不是实现缺陷。
 
-### 版本说明（2026-09）
+### 版本说明（2026-09 跟进大版本，2026-10 刷新）
 
 openai SDK 3.x 与 anthropic SDK 1.x 已跟进。两者的 breaking 点都是默认
 HTTP 客户端换成 httpx2（httpx 不再自动安装）；本项目从不传自定义
-http client，只传 timeout/max_retries，升级零改动。OpenTelemetry 的
-httpx instrumentation 只覆盖 httpx 1.x 的外呼（FastAPI 侧），LLM 的
-GenAI span（`chat {model}` 等）是本项目自己埋的 manual span，不受影响。
+http client，只传 timeout/max_retries，升级零改动。
+
+**追踪的坑（2026-10 修复）**：当时只挂了 `HTTPXClientInstrumentor`，它只认 httpx——
+LLM 请求走 httpx2，于是 HTTP 层 span（状态码、429 重试各自一条）静默消失，
+只剩本项目手写的 GenAI span（`chat {model}`）。`opentelemetry-instrumentation-httpx`
+0.66b 起同包提供 `HTTPX2ClientInstrumentor`，`setup_telemetry()` 现在两个都挂
+（httpx → A2A / langsmith，httpx2 → openai / anthropic / mcp），
+`tests/test_telemetry.py::TestOutboundHttpInstrumentation` 用真实 openai SDK 打本地假服务钉住。
+
+当前锁定（2026-10-19）：openai 3.35.1 · anthropic 1.15.0，后续由 Renovate 跟进。

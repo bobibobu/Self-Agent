@@ -74,8 +74,9 @@ async def main(apply: bool) -> None:
     pg_hits = 0
     pool = db_manager.postgres
     if pool is not None:
-        async with pool.acquire() as conn:
-            rows = await conn.fetch("SELECT thread_id, title FROM conversations")
+        async with pool.connection() as conn:
+            cur = await conn.execute("SELECT thread_id, title FROM conversations")
+            rows = await cur.fetchall()
             targets = [r for r in rows if _is_test_thread(r["thread_id"])]
             pg_hits = len(targets)
             for r in targets[:10]:
@@ -83,11 +84,11 @@ async def main(apply: bool) -> None:
             if pg_hits > 10:
                 print(f"  [pg]    ... 另有 {pg_hits - 10} 条")
             if apply and targets:
-                deleted = await conn.execute(
-                    "DELETE FROM conversations WHERE thread_id = ANY($1::text[])",
-                    [r["thread_id"] for r in targets],
+                cur = await conn.execute(
+                    "DELETE FROM conversations WHERE thread_id = ANY(%s::text[])",
+                    ([r["thread_id"] for r in targets],),
                 )
-                print(f"  [pg]    已删除会话记录：{deleted}")
+                print(f"  [pg]    已删除会话记录：{cur.rowcount} 条")
     else:
         print("  [pg]    不可用，跳过")
 
@@ -103,4 +104,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="清理测试写入真实库的数据")
     parser.add_argument("--apply", action="store_true", help="实际删除（默认只预览）")
     args = parser.parse_args()
-    asyncio.run(main(args.apply))
+    from app.core.eventloop import pg_loop_factory
+
+    # Windows 默认的 Proactor 循环跑不了 psycopg，Postgres 部分会被当成「不可用」跳过
+    asyncio.run(main(args.apply), loop_factory=pg_loop_factory)

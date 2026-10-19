@@ -90,56 +90,60 @@ Client 运行时发现 server 暴露的能力，而非硬编码。
 
 ### 作为 Client（`app/mcp/client.py`）
 
-1. 读 `mcp_servers.json` 配置
-2. 用 `MultiServerMCPClient`（langchain-mcp-adapters）连接各 server
-3. `get_tools()` 发现工具，转成 LangChain BaseTool
+1. 读 `mcp_servers.json` 配置，翻译成 fastmcp 标准的 `{"mcpServers": {...}}`
+2. 用 `langchain.mcp` 的 `MCPAdapter`（底层 fastmcp 4.x + mcp 2.x）连接各 server
+3. `list_tools()` 发现工具，转成 LangChain BaseTool
 4. `refresh_from_mcp` 塞进 Agent 工具注册表
 
 ```python
 class MCPClientManager:
     async def connect(self):
         servers = self._load_servers_config()
-        self._client = MultiServerMCPClient(servers)
-        self._tools = await self._client.get_tools()  # 发现工具
+        self._adapter = MCPAdapter(self._to_mcp_config(servers))
+        await self._adapter.__aenter__()              # 保持连接，session 跨请求可用
+        self._tools = await self._adapter.list_tools()  # 发现工具
 ```
 
 设计要点：
-- **单个 server 连不上不阻断其他**（优雅降级）
-- **工具按 server名_工具名 前缀防命名冲突**
-- **懒加载**：首次 get_tools() 才连接
+- **连不上不阻断 Agent**（优雅降级；当前是整批丢弃 MCP 工具，按 server 隔离是改进项）
+- **命名冲突**：与内置工具重名时保留内置版本并告警（registry 的 refresh_from_mcp）
+- **启动时连接**：lifespan 里 connect() 一次，disconnect() 时退出 adapter 上下文
 
 ### 作为 Server（`app/mcp/server.py`）
 
 ```python
-mcp = FastMCP("self-agent-tools")
+from fastmcp import FastMCP   # 独立包；mcp 2.0 已移除内置的 mcp.server.fastmcp
 
-@mcp.tool()
-def some_tool(...): ...
+mcp = FastMCP("self-agent-tools")
+for tool in ALL_TOOLS:
+    mcp.tool(name=tool.name, description=tool.description)(_build_typed_wrapper(tool))
 ```
 
 把本 Agent 工具暴露出去供其他 Agent 调用。两种启动：`python -m app.mcp.server`（stdio）/ `--http`（远程）。
 
 ---
 
-## 1.7 ★ 版本锁定决策（工程诚实）
+## 1.7 ★ 版本决策：先锁住，生态就绪再迁（工程诚实）
 
-Self-Agent 的 `pyproject.toml`：`mcp>=1.24.0,<2.0`，**锁 1.x 不用 2.0**。
+**第一步：锁 1.x（2026-07）。** mcp 2.0 随 2026-07-28 规范大版本发布，但当时的官方桥接
+`langchain-mcp-adapters 0.3.1` 仍用 mcp 1.x 的 `RequestContext`，强行上 2.0 会导入崩溃。
+于是 `pyproject.toml` 写成 `mcp>=1.24.0,<2.0`，用上界挡住 breaking 版本，注释写明原因。
 
-### 原因
-
-`langchain-mcp-adapters 0.3.1` 仍用 mcp 1.x 的 `RequestContext`，**未适配 mcp 2.0**（2026-07 大重构）。强行用 2.0 会导入崩溃。
+**第二步：迁到 2.x（2026-09）。** `langchain-mcp-adapters` 仓库于 2026-09-17 归档，
+官方桥接并入 langchain 主包的 `langchain.mcp` 命名空间（`langchain[mcp]` extra，底层
+fastmcp 4.x + mcp 2.x）。生态就绪后解除上限：client 换成 `MCPAdapter`，server 换成独立的
+`fastmcp` 包，约束改为 `mcp>=2.0.0,<3.0`。迁移细节见 [MCP 模块文档](../../02-modules/04-mcp.md) 第五节。
 
 ### 教训
 
-**追新不能违背兼容性现实**。等官方适配后解除上限。这是工程诚实——不为了「用最新版」引入崩溃。
-
-`pyproject.toml` 用约束 + 注释说明，待官方适配后解除上限。
+**追新不能违背兼容性现实，但锁版本也要有出口。** 上界 + 注释说明「为什么锁、等什么解锁」，
+条件满足就迁——锁是为了不被 resolver 推着走，不是为了永远不升级。
 
 ---
 
-## 1.8 为什么用 langchain-mcp-adapters 不自己写
+## 1.8 为什么用官方桥接（langchain.mcp）不自己写
 
-官方维护、经过测试、返回标准 BaseTool 无缝接入 LangGraph。
+官方维护、经过测试、返回标准 BaseTool 无缝接入 LangGraph。原独立包 langchain-mcp-adapters 已归档并迁入 langchain 主包。
 
 自己写要处理 MCP 协议细节（会话、JSON-RPC、schema 转换）约 150 行，没必要重复造轮子。
 

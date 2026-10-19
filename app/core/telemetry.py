@@ -145,13 +145,20 @@ def setup_telemetry(app: Any = None) -> bool:
         except Exception as e:  # noqa: BLE001
             logger.warning("FastAPI 自动埋点失败：%s", e)
 
-    # 出站 HTTP（A2A 调用、LLM 请求）自动埋点，便于看到外部依赖耗时
-    try:
-        from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+    # 出站 HTTP 自动埋点，便于看到外部依赖耗时（状态码、429 重试都是独立 span）。
+    # 进程里有两套 HTTP 栈，必须两个都挂：
+    #   httpx  → A2A 客户端、langsmith
+    #   httpx2 → openai 3.x / anthropic 1.x / mcp 2.x 的默认客户端（LLM 请求走这条）
+    # 只挂 httpx 的话，LLM 请求只剩手写的 `chat {model}` span，看不到底下的 HTTP 重试。
+    # HTTPX2ClientInstrumentor 自 opentelemetry-instrumentation-httpx 0.66b 起提供。
+    for label, cls_name in (("httpx", "HTTPXClientInstrumentor"), ("httpx2", "HTTPX2ClientInstrumentor")):
+        try:
+            from opentelemetry.instrumentation import httpx as otel_httpx
 
-        HTTPXClientInstrumentor().instrument(tracer_provider=provider)
-    except Exception as e:  # noqa: BLE001
-        logger.debug("httpx 自动埋点失败（不影响主流程）：%s", e)
+            getattr(otel_httpx, cls_name)().instrument(tracer_provider=provider)
+            logger.info("✅ %s 出站请求自动埋点已启用", label)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("%s 自动埋点失败（不影响主流程，但该栈的出站请求不会有 HTTP span）：%s", label, e)
 
     _initialized = True
     logger.info("✅ 链路追踪已启用（service=%s）", s.otel_service_name)

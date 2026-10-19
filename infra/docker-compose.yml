@@ -9,6 +9,10 @@
 #
 # 所有数据持久化到 ./data/ 目录，方便学习与排查。
 # 详细组件说明见 infra/README.md
+#
+# 镜像标签钉到「小版本」（如 mongo:8.0、redis:8.2-alpine）：补丁自动跟进，
+# 跨小版本/大版本由 Renovate 开 PR（见根目录 renovate.json）。
+# 已有数据卷跨大版本升级的注意事项见 docs/04-guides/依赖升级记录.md。
 # ===================================================================
 
 name: self-agent
@@ -26,7 +30,9 @@ services:
     # 用 pgvector 镜像而不是原版 postgres：LangGraph 的 PostgresStore 建
     # 语义索引时需要 vector 扩展，原版镜像里没有，store.setup() 会失败
     # （应用会降级成「持久化但无语义检索」，见 app/memory/store.py）。
-    image: docker.m.daocloud.io/pgvector/pgvector:pg16
+    # 钉 pgvector 版本：浮动的 pg16 标签会悄悄换扩展版本。已有数据卷换镜像后
+    # 执行一次 `ALTER EXTENSION vector UPDATE;` 把库里的扩展升到镜像自带版本。
+    image: docker.m.daocloud.io/pgvector/pgvector:0.8.7-pg16
     container_name: selfagent-postgres
     restart: unless-stopped
     environment:
@@ -52,7 +58,10 @@ services:
   #   为什么用它：灵活 schema，适合存"形态多变"的事件流。
   # -----------------------------------------------------------------
   mongo:
-    image: docker.1panel.live/library/mongo:7
+    # 8.0 支持到 2029-10（7.0 到 2027-08 EOL）。已有 7.0 数据卷可直接换镜像，
+    # 前提是 featureCompatibilityVersion 已是 "7.0"；稳定后再把 FCV 提到 "8.0"。
+    # 不能 7.0 直跳 9.0，必须经过 8.0。
+    image: docker.1panel.live/library/mongo:8.0
     container_name: selfagent-mongo
     restart: unless-stopped
     environment:
@@ -76,7 +85,9 @@ services:
   #   为什么用它：内存级延迟，单线程模型简单可靠。
   # -----------------------------------------------------------------
   redis:
-    image: docker.1panel.live/library/redis:7-alpine
+    # 8.2 支持到 2030-09；7.x 的 RDB/AOF 文件 8.x 直接可读。
+    # 想要更宽松的 BSD 许可可换 valkey/valkey:9（协议兼容，redis-py 照用）。
+    image: docker.1panel.live/library/redis:8.2-alpine
     container_name: selfagent-redis
     restart: unless-stopped
     # 生产环境应通过 requirepass 设置密码，这里开发态留空
@@ -92,25 +103,27 @@ services:
       retries: 10
 
   # -----------------------------------------------------------------
-  # Jaeger —— 链路追踪后端（OTLP 接收 + Web UI）
+  # Jaeger v2 —— 链路追踪后端（OTLP 接收 + Web UI）
   #   用途：看一次对话的完整 span 树（LLM 调用、工具执行、RAG 检索的
   #         父子关系与各自耗时），排查「为什么慢 / 为什么答错」。
   #   UI： http://localhost:16686
   #   应用侧只需 OTEL_ENABLED=true（默认已指向 http://localhost:4318）。
-  #   all-in-one 是内存存储，重启丢数据——开发够用，生产要换带持久化的部署。
+  #   v1（jaegertracing/all-in-one）已停更，最后一版 1.76.0。v2 基于
+  #   OpenTelemetry Collector，不带 --config 启动即 all-in-one 模式
+  #   （内存存储、OTLP 默认开启，不再需要 COLLECTOR_OTLP_ENABLED），
+  #   重启丢数据——开发够用，生产要换带持久化的部署。
   # -----------------------------------------------------------------
   jaeger:
-    image: docker.m.daocloud.io/jaegertracing/all-in-one:1.62.0
+    image: docker.m.daocloud.io/jaegertracing/jaeger:2.22.0
     container_name: selfagent-jaeger
     restart: unless-stopped
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
     ports:
       - "16686:16686"   # Web UI
       - "4318:4318"     # OTLP/HTTP 接收端点（应用往这里发 span）
       - "4317:4317"     # OTLP/gRPC（备用）
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:16686 || exit 1"]
+      # healthcheckv2 扩展（13133/status）；镜像基于 alpine，自带 busybox wget
+      test: ["CMD-SHELL", "wget -qO- http://localhost:13133/status || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -121,7 +134,9 @@ services:
   #   为什么用它：天然适合表达"实体—关系"，关系型数据库 JOIN 会很重。
   # -----------------------------------------------------------------
   neo4j:
-    image: docker.1panel.live/library/neo4j:5-community
+    # 5.26 是 LTS（支持到 2028-06）；之后 Neo4j 改用日历版本号（2026.xx），
+    # 那条线每月一版、只支持到下一版发布，开发环境留在 LTS 更省心。
+    image: docker.1panel.live/library/neo4j:5.26-community
     container_name: selfagent-neo4j
     restart: unless-stopped
     environment:
