@@ -58,6 +58,9 @@ coverage.xml
 *.pem
 *.key
 secrets/
+# 随手存 token 的文本文件（Token.txt / xxx-token.txt），凭据统一放 .env
+Token.txt
+*token*.txt
 
 # ===== 运行时配置（含本地 MCP server 连接，可能含敏感地址）=====
 mcp_servers.json
@@ -69,3 +72,9 @@ infra/data/
 *.log
 logs/
 *.pid
+
+# ===== Understand-Anything 知识图谱（.ua/）=====
+# 图谱本体（knowledge-graph.json / meta / fingerprints / config）要提交，增量更新靠它；
+# 分析过程的临时目录和回收站不提交
+.ua/.trash-*/
+.ua/tmp/

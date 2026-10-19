@@ -21,6 +21,10 @@
 uv run python clients/desktop/app.py
 ```
 
+Windows 上也可以双击仓库根目录的 `Self-Agent 桌面版.vbs`（无控制台窗口，需先 `uv sync`）。
+这个脚本检出时是 UTF-16LE 编码（WSH 读不了 UTF-8），原因和排障见
+[启动指南 · 常见问题](../../docs/03-development/02-启动指南.md)。
+
 | 参数 | 说明 |
 |---|---|
 | `--workspace DIR` | 指定工作区（缺省弹目录选择框） |

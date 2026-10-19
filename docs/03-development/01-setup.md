@@ -79,6 +79,12 @@ GLM_MODEL=glm-4.5-flash
 
 其余数据库连接信息默认指向本地 Docker 服务，无需改动。
 
+> 🔒 **凭据只放 `.env`**（已在 `.gitignore`）。不要在仓库目录里另存 `Token.txt` 之类的文本——
+> `.gitignore` 已屏蔽 `Token.txt` / `*token*.txt`，但别的文件名照样会被 `git add .` 带进提交。
+> 一旦推到远端，删文件只是从最新版本里消失，历史里还在：**先作废/轮换这个 key**，再考虑改写历史。
+> git 远端也别把 token 写进 URL（`https://user:token@host/...` 会明文躺在 `.git/config`），
+> 用凭据管理器（Windows 自带 Git Credential Manager）。
+
 > 想用 OpenAI 或 Anthropic？把 `LLM_DEFAULT_PROVIDER` 改成 `openai` / `anthropic` 并填对应 key 即可。
 
 ---

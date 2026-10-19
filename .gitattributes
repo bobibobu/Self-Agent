@@ -1,0 +1,4 @@
+# Windows 脚本（WSH）只认 ANSI / UTF-16LE，UTF-8 里的中文会按本机代码页（GBK）误读成乱码。
+# 仓库里存 UTF-8（GitHub/gitea 上 diff 可读），检出到工作区时转成 UTF-16LE(BOM) + CRLF。
+# 需要 Git 2.18+；libgit2 系工具不认 working-tree-encoding，用它们改这个文件前先确认编码。
+*.vbs text eol=crlf working-tree-encoding=UTF-16LE-BOM

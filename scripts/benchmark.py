@@ -21,7 +21,6 @@ from __future__ import annotations
 import asyncio
 import itertools
 import os
-import statistics
 import time
 
 # 先设置环境（在导入 app 前），关闭限流和学习，避免污染基准。
@@ -121,7 +120,6 @@ async def bench(client, label, method, path, payload, n, concurrency, fresh_thre
 
 
 async def main():
-    import httpx
     from httpx import ASGITransport, AsyncClient
 
     patch_llm(0.0)  # 先注入零延迟 mock
@@ -137,12 +135,12 @@ async def main():
         # 预热（编译图、初始化单例）
         await client.post("/chat", json={"message": "warmup", "thread_id": "warm"})
 
-        print(f"\n【轻量端点（并发 32）】")
+        print("\n【轻量端点（并发 32）】")
         await bench(client, "GET /health ×200", "GET", "/health", None, 200, 32)
         await bench(client, "GET /tools ×200", "GET", "/tools", None, 200, 32)
         await bench(client, "GET /sessions ×200", "GET", "/sessions", None, 200, 32)
 
-        print(f"\n【完整 Agent 链路（mock LLM 0ms，隔离 LLM 延迟测框架开销）】")
+        print("\n【完整 Agent 链路（mock LLM 0ms，隔离 LLM 延迟测框架开销）】")
         await bench(client, "POST /chat ×100 并发8 (新会话)", "POST", "/chat",
                     {"message": "测试消息", "thread_id": "b0"}, 100, 8, fresh_thread=True)
         await bench(client, "POST /chat ×200 并发32 (新会话)", "POST", "/chat",
@@ -154,13 +152,13 @@ async def main():
                     {"message": "测试消息", "thread_id": "b1"}, 100, 8)
         print("  （长会话 = 共用 thread_id，历史随请求数增长，含上下文压缩/checkpoint 开销）")
 
-        print(f"\n【流式路径（mock 0ms）】")
+        print("\n【流式路径（mock 0ms）】")
         await bench(client, "POST /chat/http-stream ×100 并发16", "POST", "/chat/http-stream",
                     {"message": "测试消息", "thread_id": "b4"}, 100, 16)
 
         # 换 500ms 延迟 mock，模拟真实 LLM（首 token 延迟）
         patch_llm(0.5)
-        print(f"\n【模拟真实 LLM（mock 500ms）——验证框架并发能力】")
+        print("\n【模拟真实 LLM（mock 500ms）——验证框架并发能力】")
         await bench(client, "POST /chat ×100 并发50 (LLM 500ms)", "POST", "/chat",
                     {"message": "测试消息", "thread_id": "b5"}, 100, 50)
 

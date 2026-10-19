@@ -72,7 +72,7 @@ class MockStreamLLM:
             return
         # 文本回复：逐字 yield（模拟 token 流）
         text = resp.content or ""
-        for i, tok in enumerate(text):
+        for tok in text:
             yield StreamChunk(content=tok)
         yield StreamChunk(
             content="",

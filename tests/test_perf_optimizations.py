@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import asyncio as _asyncio
 import uuid
 
 import pytest
@@ -210,9 +211,6 @@ class TestPromptStoreCache:
 
 
 # ==================== helpers ====================
-
-import asyncio as _asyncio
-
 
 def asyncio_run(coro):
     return _asyncio.run(coro)

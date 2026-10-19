@@ -148,8 +148,8 @@ async def main():
 def _cleanup_test_prompts(keep_versions: set[str]) -> None:
     """清理本次测试写入的提示词版本，防止污染 prompt_store（真实运行的系统提示）。"""
     import json
-    from pathlib import Path
-    from app.evolution.prompt_store import _PROMPTS_DIR, _CURRENT_FILE
+
+    from app.evolution.prompt_store import _CURRENT_FILE, _PROMPTS_DIR
 
     if not _PROMPTS_DIR.exists():
         return
