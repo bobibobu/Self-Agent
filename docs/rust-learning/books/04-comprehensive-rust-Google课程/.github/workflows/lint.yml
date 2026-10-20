@@ -1,0 +1,83 @@
+name: Lint
+permissions:
+  contents: read
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Rust cache
+        uses: ./.github/workflows/setup-rust-cache
+
+      - name: Clippy
+        run: cargo clippy -- -Dwarnings
+
+  format:
+    runs-on: ubuntu-latest
+    env:
+      NIGHTLY_VERSION: nightly-2025-09-01
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install formatting dependencies
+        uses: ./.github/workflows/apt-get-install
+        with:
+          packages: gettext yapf3
+
+      - name: Install pinned nightly for rustfmt
+        run: |
+          rustup toolchain install --profile minimal "$NIGHTLY_VERSION"
+          rustup component add rustfmt --toolchain "$NIGHTLY_VERSION"
+
+      - name: Check formatting
+        uses: dprint/check@7dc032d8874778fc024f6f9b4a7e6d896782c330 # v2.5
+
+  typos:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Check for typos
+        uses: crate-ci/typos@00f422f3b19c57bc6338715ebfe3316d38768461 # v1.50.3
+        with:
+          config: ./.github/typos.toml
+
+  lockfiles:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Bazel cache
+        uses: ./.github/workflows/setup-bazel-cache
+
+      - name: Setup Rust cache
+        uses: ./.github/workflows/setup-rust-cache
+
+      - name: Check Cargo lockfile
+        run: cargo update --workspace --locked
+
+      - name: Check Bazel lockfile
+        run: bazel mod deps --lockfile_mode=error

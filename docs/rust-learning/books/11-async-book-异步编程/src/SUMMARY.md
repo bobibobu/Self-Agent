@@ -1,0 +1,78 @@
+# Table of Contents
+
+[Introduction](intro.md)
+
+- [Navigation](navigation/intro.md)
+  - [By topic](navigation/topics.md)
+  - [FAQs]()
+  - [Index](navigation/index.md)
+
+# Part 1: guide
+
+- [Introduction](part-guide/intro.md)
+- [Concurrent programming](part-guide/concurrency.md)
+- [Async and await](part-guide/async-await.md)
+- [More async/await topics](part-guide/more-async-await.md)
+- [IO and issues with blocking](part-guide/io.md)
+- [Composing futures concurrently](part-guide/concurrency-primitives.md)
+- [Channels, locking, and synchronization](part-guide/sync.md)
+- [Tools for async programming](part-guide/tools.md)
+- [Destruction and clean-up](part-guide/dtors.md)
+- [Futures](part-guide/futures.md)
+- [Runtimes](part-guide/runtimes.md)
+- [Timers and signal handling](part-guide/timers-signals.md)
+- [Async iterators (streams)](part-guide/streams.md)
+
+# Part 2: reference
+
+- [Implementing futures and streams]()
+- [Alternate runtimes]()
+- [Implementing your own runtime]()
+- [async in sync, sync in async]()
+- [Async IO: readiness vs completion, and io_uring]()
+- [Design patterns]()
+- [Cancellation and cancellation safety](part-reference/cancellation.md) (cancellation safety)
+- [Starvation]()
+- [Pinning](part-reference/pinning.md)
+- [Async and FFI]()
+- [Comparing async programming in Rust to other languages]()
+- [The implementation of async/await in rustc]()
+- [Structured concurrency](part-reference/structured.md)
+
+
+# Old chapters
+
+- [Getting Started](01_getting_started/01_chapter.md)
+  - [Why Async?](01_getting_started/02_why_async.md)
+  - [The State of Asynchronous Rust](01_getting_started/03_state_of_async_rust.md)
+  - [`async`/`.await` Primer](01_getting_started/04_async_await_primer.md)
+- [Under the Hood: Executing `Future`s and Tasks](02_execution/01_chapter.md)
+  - [The `Future` Trait](02_execution/02_future.md)
+  - [Task Wakeups with `Waker`](02_execution/03_wakeups.md)
+  - [Applied: Build an Executor](02_execution/04_executor.md)
+  - [Executors and System IO](02_execution/05_io.md)
+- [`async`/`await`](03_async_await/01_chapter.md)
+- [Streams](05_streams/01_chapter.md)
+  - [Iteration and Concurrency](05_streams/02_iteration_and_concurrency.md)
+- [Executing Multiple Futures at a Time](06_multiple_futures/01_chapter.md)
+  - [`join!`](06_multiple_futures/02_join.md)
+  - [`select!`](06_multiple_futures/03_select.md)
+  - [Spawning](06_multiple_futures/04_spawning.md)
+  - [TODO: Cancellation and Timeouts]()
+  - [TODO: `FuturesUnordered`]()
+- [Workarounds to Know and Love](07_workarounds/01_chapter.md)
+  - [`Send` Approximation](07_workarounds/03_send_approximation.md)
+  - [Recursion](07_workarounds/04_recursion.md)
+  - [`async` in Traits](07_workarounds/05_async_in_traits.md)
+- [The Async Ecosystem](08_ecosystem/00_chapter.md)
+- [Final Project: HTTP Server](09_example/00_intro.md)
+  - [Running Asynchronous Code](09_example/01_running_async_code.md)
+  - [Handling Connections Concurrently](09_example/02_handling_connections_concurrently.md)
+  - [Testing the Server](09_example/03_tests.md)
+- [TODO: I/O]()
+  - [TODO: `AsyncRead` and `AsyncWrite`]()
+- [TODO: Asynchronous Design Patterns: Solutions and Suggestions]()
+  - [TODO: Modeling Servers and the Request/Response Pattern]()
+  - [TODO: Managing Shared State]()
+- [Appendix: Translations of the Book](12_appendix/01_translations.md)
+

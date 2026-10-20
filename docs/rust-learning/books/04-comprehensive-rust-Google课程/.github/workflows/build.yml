@@ -1,0 +1,205 @@
+name: Test
+permissions:
+  contents: read
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cargo:
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Bazel cache
+        uses: ./.github/workflows/setup-bazel-cache
+
+      - name: Test Rust code
+        run: bazel test //...
+
+  bare-metal:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - directory: src/bare-metal/alloc-example
+            target: aarch64-unknown-none
+          - directory: src/bare-metal/aps/examples
+            target: aarch64-unknown-none
+          - directory: src/bare-metal/microcontrollers/examples
+            target: thumbv7em-none-eabihf
+          - directory: src/exercises/bare-metal/compass
+            target: thumbv7em-none-eabihf
+          - directory: src/exercises/bare-metal/rtc
+            target: aarch64-unknown-none
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install toolchain
+        run: |
+          rustup update
+          rustup target add ${{ matrix.target }}
+
+      - name: Setup Rust cache
+        uses: ./.github/workflows/setup-rust-cache
+
+      - name: Install dependencies
+        uses: ./.github/workflows/apt-get-install
+        with:
+          packages: gcc-aarch64-linux-gnu
+
+      - name: Build Rust code
+        working-directory: ${{ matrix.directory }}
+        run: cargo build
+
+  find-languages:
+    runs-on: ubuntu-latest
+    outputs:
+      languages: ${{ steps.find-languages.outputs.languages }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Find languages
+        id: find-languages
+        shell: python
+        run: |
+          import os, json, pathlib
+          languages = ["en"] + [p.stem for p in pathlib.Path("po").iterdir() if p.suffix == ".po"]
+          github_output = open(os.environ["GITHUB_OUTPUT"], "a")
+          github_output.write("languages=")
+          json.dump(sorted(languages), github_output)
+
+  build:
+    runs-on: ubuntu-latest
+    needs:
+      - find-languages
+    strategy:
+      matrix:
+        language: ${{ fromJSON(needs.find-languages.outputs.languages) }}
+      fail-fast: false
+    env:
+      # Opt-in for checking links in translations - add the language below.
+      LINK_CHECKED_LANGUAGES: '["en", "fa"]'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0 # We need the full history for build.sh below.
+          persist-credentials: false
+
+      - name: Update Rust
+        run: rustup update
+
+      - name: Setup Bazel cache
+        uses: ./.github/workflows/setup-bazel-cache
+
+      - name: Setup Rust cache
+        uses: ./.github/workflows/setup-rust-cache
+        with:
+          key: ${{ contains(fromJSON(env.LINK_CHECKED_LANGUAGES), matrix.language) }}
+
+      - name: Install dependencies
+        uses: ./.github/workflows/apt-get-install
+        with:
+          packages: gettext
+
+      - name: Install mdbook
+        uses: ./.github/workflows/install-mdbook
+
+      - name: Test format of ${{ matrix.language }} translation
+        if: matrix.language != 'en'
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: msgfmt --statistics -o /dev/null "po/${LANGUAGE}.po"
+
+      - name: Test extracting English strings
+        if: matrix.language == 'en'
+        run: |
+          MDBOOK_OUTPUT='{"xgettext": {"pot-file": "messages.pot"}}' mdbook build -d po
+          msgfmt -o /dev/null --statistics po/messages.pot
+
+      - name: Build ${{ matrix.language }} translation
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: |
+          .github/workflows/build.sh "$LANGUAGE" "book/comprehensive-rust-${LANGUAGE}"
+
+      # Upload the book now to retain it in case mdbook test fails.
+      - name: Upload book
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: comprehensive-rust-${{ matrix.language }}
+          path: book/
+
+      - name: Test code snippets
+        env:
+          MDBOOK_BOOK__LANGUAGE: ${{ matrix.language }}
+        run: mdbook test
+
+  web-tests:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: "tests/package-lock.json"
+      - name: Install test framework
+        run: npm install
+        working-directory: ./tests
+      - name: Download english book
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: comprehensive-rust-en
+          path: book/
+      - name: Test Javascript
+        run: cargo xtask web-tests --dir book/comprehensive-rust-en/html
+
+  po-diff:
+    name: Translation diff
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Bazel cache
+        uses: ./.github/workflows/setup-bazel-cache
+
+      - name: Copy latest version of translations
+        run: cp -r po new-po
+
+      - name: Checkout base version
+        run: git checkout ${{ github.event.pull_request.base.sha }} -- po
+
+      - name: Translation diff
+        run: bazel run @binaries//:i18n-report__i18n-report -- diff $PWD/po/ $PWD/new-po/ > $GITHUB_STEP_SUMMARY

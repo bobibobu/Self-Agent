@@ -1,0 +1,86 @@
+name: Publish
+
+# See also TRANSLATIONS.md.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Update the language picker in index.hbs to link new languages.
+  LANGUAGES: ar bn da de el es fa fr id it ja ko pl pt-BR ro ru tr uk vi zh-CN zh-TW
+
+jobs:
+  publish:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0 # We need the full history for build.sh below.
+          persist-credentials: false
+
+      - name: Update Rust
+        run: rustup update
+
+      - name: Setup Bazel cache
+        uses: ./.github/workflows/setup-bazel-cache
+
+      - name: Setup Rust cache
+        uses: ./.github/workflows/setup-rust-cache
+
+      - name: Install Gettext
+        uses: ./.github/workflows/apt-get-install
+        with:
+          packages: gettext
+
+      - name: Install mdbook
+        uses: ./.github/workflows/install-mdbook
+
+      - name: Build course in English
+        run: .github/workflows/build.sh en book
+
+      - name: Build all translations
+        run: |
+          for po_lang in ${{ env.LANGUAGES }}; do
+              .github/workflows/build.sh $po_lang book/$po_lang
+              mv book/$po_lang/html book/html/$po_lang
+          done
+
+      - name: Build translation report
+        run: i18n-report report book/html/translation-report.html po/*.po
+
+      - name: Build synced translation report
+        run: |
+          cp -r po synced-po
+          MDBOOK_OUTPUT='{"xgettext": {"pot-file": "messages.pot", "granularity": 0}}' mdbook build -d synced-po
+          for file in synced-po/*.po; do msgmerge --update $file synced-po/messages.pot ; done
+          i18n-report report book/html/synced-translation-report.html synced-po/*.po
+
+      - name: Setup Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: book/html
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

@@ -1,0 +1,39 @@
+# Build artifacts
+/book/
+target/
+*.bin
+
+# Bazel files
+/bazel-*
+
+# Translation artifacts
+po/*.mo
+po/*.po~
+
+# macOS artifacts
+.DS_Store
+
+# Jetbrains IDEs project files
+.idea/
+.iml
+.iws
+count.dat
+
+# Nodejs Files (dprint)
+node_modules/
+package.json
+!tests/package.json
+pnpm-lock.yaml
+
+# Crowdin Config (Contains API Keys)
+crowdin.yml
+
+# Google's Project IDX files and VSCode
+.idx/
+.vscode/
+
+# Python virtualenv (for mdbook-slide-evaluator local installation)
+.venv/
+
+# tests/ framework artifacts
+tests/src/slide/slides/slides.list.ts
