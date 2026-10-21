@@ -1,0 +1,46 @@
+name: Website
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+
+  build:
+    name: Website
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      # The Hexo site only needs Node and Python 3 (preinstalled on the
+      # runner). The old pipeline shelled out to a hand-maintained 3.4 GB
+      # texlive Docker image just to also build the PDF/epub; that image
+      # silently drifted to a 2019 Node and broke the build. We deploy the
+      # website only here. The PDF/epub already on the server are left in
+      # place (scp overwrites, never deletes), so their download links keep
+      # working until those artifacts are rebuilt separately.
+      - name: Install website dependencies
+        run: npm ci --prefix website
+
+      - name: Build website
+        run: cd website && make
+
+      - name: Deploy to server
+        env:
+          USER: ${{ secrets.SERVER_USER }}
+          TARGET: ${{ secrets.SERVER_PATH }}
+          KEY: ${{ secrets.SERVER_KEY }}
+          DOMAIN: ${{ secrets.SERVER_DOMAIN }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+          chmod 400 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$DOMAIN" >> ~/.ssh/known_hosts
+          scp -i ~/.ssh/id_ed25519 -r website/public/modern-cpp/* "$USER@$DOMAIN:$TARGET"

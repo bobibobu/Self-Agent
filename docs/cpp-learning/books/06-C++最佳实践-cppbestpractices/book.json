@@ -1,0 +1,9 @@
+{
+    "plugins": [ "github" ],
+    "pluginsConfig": {
+        "github": {
+            "url": "https://github.com/lefticus/cppbestpractices"
+        }
+    }
+
+}

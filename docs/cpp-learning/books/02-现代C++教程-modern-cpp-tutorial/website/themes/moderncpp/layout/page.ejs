@@ -1,0 +1,38 @@
+<%
+  var ui = mcpp_ui(page);
+  var outline = toc(page.content, { class: 'toc', list_number: false, min_depth: 2, max_depth: 3 });
+  var hasOutline = (outline.match(/<a /g) || []).length >= 2;
+
+  // Neighbours in reading order, among the pages of the same kind.
+  var siblings = page.type ? mcpp_pages(page.type) : [];
+  var at = siblings.findIndex(function (p) { return p.path === page.path; });
+  var prev = at > 0 ? siblings[at - 1] : null;
+  var next = at >= 0 && at < siblings.length - 1 ? siblings[at + 1] : null;
+  var href = function (p) { return url_for(p.path).replace(/index\.html$/, ''); };
+%>
+<div class="layout<%- hasOutline ? '' : ' no-outline' %>">
+  <%- partial('partials/sidebar') %>
+  <main id="content" class="main">
+    <article class="article">
+      <%- mcpp_enhance(page.content, page.title) %>
+    </article>
+    <% if (prev || next) { %>
+    <nav class="pager" aria-label="<%- ui.prev %> / <%- ui.next %>">
+      <% if (prev) { %>
+        <a class="pager-prev" href="<%- href(prev) %>"><span class="pager-dir">← <%- ui.prev %></span><span class="pager-title"><%- prev.title %></span></a>
+      <% } else { %><span></span><% } %>
+      <% if (next) { %>
+        <a class="pager-next" href="<%- href(next) %>"><span class="pager-dir"><%- ui.next %> →</span><span class="pager-title"><%- next.title %></span></a>
+      <% } %>
+    </nav>
+    <% } %>
+    <%- partial('partials/footer') %>
+  </main>
+  <% if (hasOutline) { %>
+  <nav class="outline" aria-label="<%- ui.onThisPage %>">
+    <div class="outline-head"><%- ui.onThisPage %></div>
+    <%- outline %>
+  </nav>
+  <% } %>
+</div>
+<div class="scrim" aria-hidden="true"></div>

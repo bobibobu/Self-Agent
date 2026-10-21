@@ -1,0 +1,106 @@
+<%
+  var ui = mcpp_ui(page);
+  var isEn = mcpp_lang(page) === 'en';
+  var isIndex = mcpp_is_index(page);
+
+  // Absolute URLs for this page and its other-language twin. Book chapters and
+  // About pages have a same-path twin; everything else maps to the landing.
+  // Shared with the visible language switcher so the two never drift.
+  var SITE = 'https://changkun.de';
+  var ROOT = '/modern-cpp/';
+  var _p = page.path || '';
+  var zhUrl, enUrl;
+  if (_p.indexOf('zh-cn/') !== -1) {
+    zhUrl = SITE + '/' + _p.replace(/index\.html$/, '');
+    enUrl = SITE + '/' + _p.replace('zh-cn/', 'en-us/').replace(/index\.html$/, '');
+  } else if (_p.indexOf('en-us/') !== -1) {
+    enUrl = SITE + '/' + _p.replace(/index\.html$/, '');
+    zhUrl = SITE + '/' + _p.replace('en-us/', 'zh-cn/').replace(/index\.html$/, '');
+  } else if (_p.indexOf('/about/en/') !== -1) {
+    enUrl = SITE + '/' + _p.replace(/index\.html$/, '');
+    zhUrl = SITE + '/' + _p.replace('/about/en/', '/about/');
+  } else if (_p.indexOf('/about/') !== -1) {
+    zhUrl = SITE + '/' + _p.replace(/index\.html$/, '');
+    enUrl = SITE + '/' + _p.replace('/about/', '/about/en/');
+  } else {
+    zhUrl = SITE + ROOT;
+    enUrl = SITE + ROOT + 'en/';
+  }
+  var canonicalUrl = isEn ? enUrl : zhUrl;
+
+  var siteName = ui.site;
+  var siteTagline = isEn ? 'Modern C++ Tutorial: C++11 to C++26 On the Fly' : '现代 C++ 教程: 高速上手 C++11 到 C++26';
+  var pageTitle = (page.title ? page.title + ' - ' : '') + siteTagline;
+  var pageDesc = page.description ? page.description : (isEn
+    ? 'A fast, comprehensive guide to the features of modern C++, from C++11 through C++26.'
+    : '高速上手现代 C++ 特性的全面教程，覆盖 C++11 到 C++26。');
+  var ogImage = SITE + ROOT + 'assets/' + (isEn ? 'og-en.png' : 'og-zh.png');
+  var fonts = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap';
+%>
+<!DOCTYPE html>
+<html lang="<%- ui.htmlLang %>" class="<%- isIndex ? 'is-landing' : 'is-page' %>">
+  <head>
+    <meta charset="utf-8">
+    <% if (isIndex && !isEn) { %>
+    <!-- Browser-language auto-routing: send non-Chinese browsers (or anyone
+         whose remembered choice is English) to the English landing. A stored
+         'zh' preference is honored and never bounced. Runs before any external
+         script so the redirect is not blocked on a network download. -->
+    <script>
+    (function () {
+      var pref = null;
+      try { pref = localStorage.getItem('mcpp-lang'); } catch (e) {}
+      if (pref === 'zh') return;
+      var enBrowser = (navigator.language || navigator.userLanguage || 'en')
+        .toLowerCase().indexOf('zh') !== 0;
+      if (pref === 'en' || enBrowser) { location.replace('/modern-cpp/en/'); }
+    })();
+    </script>
+    <% } %>
+    <title><%- pageTitle %></title>
+    <meta name="description" content="<%- pageDesc %>">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="canonical" href="<%- canonicalUrl %>">
+    <link rel="alternate" hreflang="zh-CN" href="<%- zhUrl %>">
+    <link rel="alternate" hreflang="en" href="<%- enUrl %>">
+    <link rel="alternate" hreflang="x-default" href="<%- SITE + ROOT %>">
+
+    <link rel="icon" type="image/png" sizes="32x32" href="/modern-cpp/assets/favicon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/modern-cpp/assets/apple-touch-icon.png">
+    <meta name="msapplication-TileColor" content="#7e2d36">
+    <meta name="theme-color" content="#ffffff">
+
+    <meta property="og:type" content="<%- isIndex ? 'website' : 'article' %>">
+    <meta property="og:site_name" content="<%- siteName %>">
+    <meta property="og:title" content="<%- pageTitle %>">
+    <meta property="og:description" content="<%- pageDesc %>">
+    <meta property="og:url" content="<%- canonicalUrl %>">
+    <meta property="og:image" content="<%- ogImage %>">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:locale" content="<%- isEn ? 'en_US' : 'zh_CN' %>">
+    <meta property="og:locale:alternate" content="<%- isEn ? 'zh_CN' : 'en_US' %>">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<%- pageTitle %>">
+    <meta name="twitter:description" content="<%- pageDesc %>">
+    <meta name="twitter:image" content="<%- ogImage %>">
+
+    <!-- Web fonts load without blocking the first paint: where Google Fonts
+         is slow or unreachable the page renders at once in the system faces
+         named in the stylesheet, and swaps in Inter when it arrives. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="<%- fonts %>" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="<%- fonts %>"></noscript>
+
+    <link rel="stylesheet" href="<%- url_for('/modern-cpp/css/book.css') %>?v=<%- mcpp_build() %>">
+    <script async src="https://changkun.de/urlstat/client.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#content"><%- ui.skip %></a>
+    <%- partial('partials/topbar') %>
+    <%- body %>
+    <script src="<%- url_for('/modern-cpp/js/book.js') %>?v=<%- mcpp_build() %>" defer></script>
+  </body>
+</html>
